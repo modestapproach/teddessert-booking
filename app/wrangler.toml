@@ -38,9 +38,14 @@ name = "BOOKING_APP"
 new_sqlite_classes = ["BookingApp"]
 tag = "v1"
 
+# custom_domain (not a plain route): Cloudflare creates the DNS record and the
+# certificate itself. A `pattern` + `zone_name` route needs a DNS record for
+# book.teddessert.com to already exist, and deleting the old Worker took that
+# record with it — so a route would deploy "successfully" and still not
+# resolve. This is what the previous Worker actually had attached.
 [[routes]]
-pattern = "book.teddessert.com/*"
-zone_name = "teddessert.com"
+pattern = "book.teddessert.com"
+custom_domain = true
 
 [vars]
 NODE_ENV = "production"
