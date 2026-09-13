@@ -1,0 +1,12 @@
+{
+  "name": "@teddessert/booking-cli",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Command-line client for the booking site's admin MCP (packages/backend/convex/adminMcp.ts). Same tools, same key, no MCP client needed.",
+  "type": "module",
+  "bin": { "booking": "./bin/booking.mjs" },
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "test": "node --test test/"
+  }
+}
