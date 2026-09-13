@@ -4276,6 +4276,7 @@ __metadata:
     short-uuid: "npm:4.2.0"
     sonner: "npm:1.7.4"
     stripe: "npm:9.16.0"
+    superagent-proxy: "file:./stubs/superagent-proxy"
     superjson: "npm:1.9.1"
     tailwindcss: "npm:4.1.17"
     ts-node: "npm:10.9.2"
@@ -40928,6 +40929,13 @@ __metadata:
     sucrase: bin/sucrase
     sucrase-node: bin/sucrase-node
   checksum: 10/b64d154a7a7eaa4b39668c3124bd08cd505f683d36ac4fb94def6491fb3af155b24b6e41b55011e38582e7d59c440af79ffba8709f3da78aeedf2f07b6d51d84
+  languageName: node
+  linkType: hard
+
+"superagent-proxy@file:./stubs/superagent-proxy::locator=%40calcom%2Fweb%40workspace%3Aapps%2Fweb":
+  version: 0.0.0-stub
+  resolution: "superagent-proxy@file:./stubs/superagent-proxy#./stubs/superagent-proxy::hash=d843f6&locator=%40calcom%2Fweb%40workspace%3Aapps%2Fweb"
+  checksum: 10/b0da746fe5cd66f02503ece32086b599997bbdce875a35931bfac2b5074b42346bf8b7499cea9230f6c1459191bbbb299a464e2b6808ee67e883d210412bf643
   languageName: node
   linkType: hard
 

@@ -109,10 +109,20 @@ push to main (app/**) ──► GitHub Actions: next build --webpack ──► o
     adapter runs everything on the Node.js runtime and refuses to bundle edge
     routes ("cannot use the edge runtime"). `app/api/social/og/image` had it;
     `next/og` works on Node.
-  - `superagent-proxy` is aliased to an empty module and removed from
-    `serverExternalPackages`. It is an optional plugin `rest-facade` tries to
-    load and is not installed; as an external, webpack left the `require()`
-    in place and OpenNext's esbuild could not resolve it.
+  - `open-next.config.ts` sets `cloudflare.useWorkerdCondition: false`. By
+    default OpenNext bundles with esbuild's `workerd` export condition, which
+    resolves packages that declare it (`@sentry/nextjs`, `uncrypto`,
+    `node-fetch-native`, …) to edge/web builds that Next's file trace never
+    copied — "Could not resolve", 41 errors for Sentry alone. The flag makes
+    esbuild resolve the files the trace copied. It is the escape hatch
+    OpenNext's own source documents for this mismatch; per-package
+    `outputFileTracingIncludes` was tried and works, but is whack-a-mole
+    against an unknown list.
+  - `superagent-proxy` is a two-line stub package (`apps/web/stubs/`)
+    installed via `file:`. `rest-facade` requires it lazily and it is never
+    installed for real; `rest-facade` is a traced dependency bundled by
+    esbuild, not webpack, so a webpack alias does not reach it. The real
+    plugin would drag the whole `proxy-agent` tree into the Worker.
 - **Limits to keep in mind** — 64 MiB uncompressed Worker size, 128 MB memory
   per isolate. The deploy workflow prints the bundle size on every run.
 
