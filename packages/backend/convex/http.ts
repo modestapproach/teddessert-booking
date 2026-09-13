@@ -28,6 +28,7 @@ import {
   bookPairJoinHandler,
 } from "./scheduling/publicApi";
 import { handleBookingStripeWebhook } from "./scheduling/payments";
+import { adminMcpHandler } from "./adminMcp";
 
 const http = httpRouter();
 
@@ -70,6 +71,11 @@ http.route({ pathPrefix: "/book/api/poll/", method: "POST", handler: bookPollVot
 http.route({ path: "/book/mcp", method: "POST", handler: bookMcpHandler });
 http.route({ path: "/book/mcp", method: "GET", handler: bookMcpHandler });
 http.route({ path: "/book/mcp", method: "OPTIONS", handler: bookMcpHandler });
+// Owner-side admin MCP (event types, schedules, bookings, calendars, profile).
+http.route({ path: "/admin/mcp", method: "POST", handler: adminMcpHandler });
+http.route({ path: "/admin/mcp", method: "GET", handler: adminMcpHandler });
+http.route({ path: "/admin/mcp", method: "DELETE", handler: adminMcpHandler });
+http.route({ path: "/admin/mcp", method: "OPTIONS", handler: adminMcpHandler });
 
 // Google Calendar OAuth return leg. The consent URL is minted by
 // scheduling/calendarOauth.adminStartCalendarConnect (called by the web app);

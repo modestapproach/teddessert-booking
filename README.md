@@ -34,6 +34,20 @@ authed call as the owner (`convex/_helpers/auth.ts`). The public API is
 key-less. Feature flags default **ON** (a `featureFlags` row can still turn one
 off).
 
+## Agent access (MCP + CLI)
+
+Agents administer the site through the **admin MCP** at
+`https://effervescent-dinosaur-191.convex.site/admin/mcp`
+(`packages/backend/convex/adminMcp.ts`): 24 tools over the same admin functions
+the UI uses (event types, schedules, weekly availability, date overrides,
+bookings, connected calendars, profile), gated by an agent API key with the
+`admin:read` / `admin:write` scopes. It is stateless Streamable HTTP and accepts
+both the 2026-07-28 protocol (no handshake, mirrored headers) and the
+2025-era handshake clients such as openclaw. `packages/cli` ships a `booking`
+CLI over the same endpoint. Key minting, openclaw registration and command
+examples: [`packages/cli/README.md`](./packages/cli/README.md). The booker-side
+MCP at `/book/mcp` (public, capability-token based) is unchanged.
+
 ## Deploy
 
 ### Convex backend (`packages/backend`)

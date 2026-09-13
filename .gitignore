@@ -8,3 +8,4 @@ out
 dist
 packages/backend/convex/_generated
 deploy/.env
+.env.agent
