@@ -41,9 +41,11 @@ ENV NEXT_PUBLIC_WEBAPP_URL=$NEXT_PUBLIC_WEBAPP_URL \
     NODE_ENV=production \
     NODE_OPTIONS=--max-old-space-size=6144
 
-# Run next build directly — skips the sentry:release step in the npm script
+# Run next build directly — skips the sentry:release step in the npm script.
+# copy-app-store-static first: turbo's `build` task depends on it, a raw
+# `next build` does not, and the OG-image route imports the JSON it writes.
 WORKDIR /app/apps/web
-RUN yarn next build
+RUN yarn copy-app-store-static && yarn next build
 
 # ---- runtime ----
 FROM node:22-alpine AS runner

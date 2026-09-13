@@ -91,6 +91,20 @@ push to main (app/**) ──► GitHub Actions: next build --webpack ──► o
     Node-runtime-only, and older OpenNext refuses to bundle it.
   - `NEXT_PRIVATE_MINIMAL_MODE=1` at runtime (opennextjs-cloudflare#1232),
     inherited from dibslist's config.
+  - `outputFileTracingRoot` is a **top-level** `next.config.ts` key. Under
+    `experimental` (where upstream had it) Next 16 silently ignores it, the
+    trace root falls back to `apps/web`, and hoisted workspace packages
+    (`uncrypto` was the first) are missing from the server tree OpenNext
+    copies. Same trap for the Docker standalone build.
+  - `yarn copy-app-store-static` before `next build`. Turbo's `build` task
+    depends on it; a raw `next build` (the workflow, the Dockerfile) does not,
+    and `app/api/social/og/image` imports the `svg-hashes.json` it generates.
+  - `sharp` is aliased to an empty module in the client-and-server webpack
+    config rather than ignored: `IgnorePlugin` makes `require("sharp")` throw
+    at load, and `/api/avatar/[uuid]` loads it at module level, which kills
+    page-data collection. Consequence on Workers: that avatar route fails
+    when called (sharp is native and cannot run there). It works in the
+    container.
 - **Limits to keep in mind** — 64 MiB uncompressed Worker size, 128 MB memory
   per isolate. The deploy workflow prints the bundle size on every run.
 

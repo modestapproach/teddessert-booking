@@ -47,6 +47,11 @@ jobs:
           HUSKY: "0"
         run: yarn install
 
+      # Generates public/app-store/svg-hashes.json. Turbo's `build` task depends
+      # on this; a raw `next build` does not, and the OG-image route imports it.
+      - name: Generate app-store static assets
+        run: yarn copy-app-store-static
+
       # NEXT_PUBLIC_* are inlined at `next build`; the two secret placeholders
       # only satisfy next.config existence checks. Real values are Worker
       # secrets at runtime (synced below).
