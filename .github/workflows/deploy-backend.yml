@@ -19,19 +19,14 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      # convex/_generated is gitignored; tsc needs it, so generate against the
-      # production deployment first (the same key the deploy step uses).
-      - name: Generate Convex bindings
-        working-directory: packages/backend
-        env:
-          CONVEX_DEPLOY_KEY: ${{ secrets.CONVEX_DEPLOY_KEY }}
-        run: npx convex codegen
-      - name: Typecheck + test
-        run: |
-          pnpm --filter @teddessert/booking-backend typecheck
-          pnpm --filter @dibslist/scheduling-engine test
+      # convex/_generated is gitignored and `convex codegen` needs a logged-in
+      # deployment, so the backend typecheck happens inside `convex deploy`
+      # (it generates bindings and runs tsc before pushing). Only the engine's
+      # tests run here.
+      - name: Test scheduling engine
+        run: pnpm --filter @dibslist/scheduling-engine test
       - name: Deploy to Convex (effervescent-dinosaur-191)
         working-directory: packages/backend
         env:
           CONVEX_DEPLOY_KEY: ${{ secrets.CONVEX_DEPLOY_KEY }}
-        run: npx convex deploy --typecheck disable -y
+        run: npx convex deploy -y
