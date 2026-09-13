@@ -19,6 +19,13 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      # convex/_generated is gitignored; tsc needs it, so generate against the
+      # production deployment first (the same key the deploy step uses).
+      - name: Generate Convex bindings
+        working-directory: packages/backend
+        env:
+          CONVEX_DEPLOY_KEY: ${{ secrets.CONVEX_DEPLOY_KEY }}
+        run: npx convex codegen
       - name: Typecheck + test
         run: |
           pnpm --filter @teddessert/booking-backend typecheck
