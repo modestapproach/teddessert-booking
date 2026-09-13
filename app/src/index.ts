@@ -19,7 +19,7 @@ const FORWARDED_SECRETS = [
   "OWNER_USERNAME",
 ] as const;
 
-export class BookingApp extends Container<Env> {
+export class BookingApp extends Container {
   defaultPort = 3000;
   sleepAfter = "2h";
   enableInternet = true;
