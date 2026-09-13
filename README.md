@@ -109,6 +109,10 @@ push to main (app/**) ──► GitHub Actions: next build --webpack ──► o
     adapter runs everything on the Node.js runtime and refuses to bundle edge
     routes ("cannot use the edge runtime"). `app/api/social/og/image` had it;
     `next/og` works on Node.
+  - `superagent-proxy` is aliased to an empty module and removed from
+    `serverExternalPackages`. It is an optional plugin `rest-facade` tries to
+    load and is not installed; as an external, webpack left the `require()`
+    in place and OpenNext's esbuild could not resolve it.
 - **Limits to keep in mind** — 64 MiB uncompressed Worker size, 128 MB memory
   per isolate. The deploy workflow prints the bundle size on every run.
 

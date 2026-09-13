@@ -233,11 +233,23 @@ const nextConfig = (phase: string): NextConfig => {
     // packages/* and hoisted node_modules from the workspace root. Top-level
     // since Next 15 — under `experimental` it is silently ignored.
     outputFileTracingRoot: path.join(__dirname, "../../"),
+    // OpenNext bundles with esbuild's "workerd" condition, which resolves
+    // @sentry/nextjs to its edge build — a file nft (node/require conditions)
+    // never traces, so esbuild fails with "Could not resolve". Copy the edge
+    // build and what it pulls in. Globs are relative to this directory.
+    outputFileTracingIncludes: {
+      "/**": [
+        "../../node_modules/@sentry/nextjs/**/*",
+        "../../node_modules/@sentry/vercel-edge/**/*",
+        "../../node_modules/@sentry/core/**/*",
+        "../../node_modules/@sentry/opentelemetry/**/*",
+        "../../node_modules/@opentelemetry/api/**/*",
+      ],
+    },
     serverExternalPackages: [
       "deasync",
       "http-cookie-agent",
       "rest-facade",
-      "superagent-proxy",
       "superagent",
       "formidable",
       "@boxyhq/saml-jackson",
@@ -279,7 +291,10 @@ const nextConfig = (phase: string): NextConfig => {
         // kills `next build`'s page-data collection. With alias:false the route
         // builds and only fails if actually called (it cannot work on Workers
         // either way — sharp is native).
-        config.resolve.alias = { ...config.resolve.alias, sharp: false };
+        // superagent-proxy is an optional plugin that is not installed; as a
+        // serverExternalPackages entry webpack left the require() in place and
+        // OpenNext's esbuild could not resolve it. Empty module instead.
+        config.resolve.alias = { ...config.resolve.alias, sharp: false, "superagent-proxy": false };
         config.plugins.push(
           // deasync is a libuv native addon — also unbundleable in Workers.
           // It's already in serverExternalPackages but this stops it appearing
