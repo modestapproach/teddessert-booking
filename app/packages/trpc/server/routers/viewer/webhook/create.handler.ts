@@ -1,0 +1,106 @@
+import { v4 } from "uuid";
+
+import { updateTriggerForExistingBookings } from "@calcom/features/webhooks/lib/scheduleTrigger";
+import { validateUrlForSSRFSync } from "@calcom/lib/ssrfProtection";
+import { prisma } from "@calcom/prisma";
+import type { Webhook } from "@calcom/prisma/client";
+import type { Prisma } from "@calcom/prisma/client";
+import { EventTypeMetaDataSchema } from "@calcom/prisma/zod-utils";
+import type { TrpcSessionUser } from "@calcom/trpc/server/types";
+
+import { TRPCError } from "@trpc/server";
+
+import type { TCreateInputSchema } from "./create.schema";
+
+type CreateOptions = {
+  ctx: {
+    user: NonNullable<TrpcSessionUser>;
+  };
+  input: TCreateInputSchema;
+};
+
+export const createHandler = async ({ ctx, input }: CreateOptions) => {
+  const { user } = ctx;
+
+  // no-Postgres fork (`ctx.user.uuid` = the dibslist authUserId): persist to Convex
+  // (webhookEndpoints) via the owner adapter instead of prisma. SSRF-validate first,
+  // exactly as the Postgres path below does.
+  if (user.uuid) {
+    const forkValidation = validateUrlForSSRFSync(input.subscriberUrl);
+    if (!forkValidation.isValid) {
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: `Webhook URL is not allowed: ${forkValidation.error}`,
+      });
+    }
+    const { createOwnerWebhook } = await import("@calcom/lib/server/calcomWebhookAdapters");
+    const created = await createOwnerWebhook({
+      ownerAuthUserId: user.uuid,
+      subscriberUrl: input.subscriberUrl,
+      eventTriggers: input.eventTriggers,
+      active: input.active,
+      payloadTemplate: input.payloadTemplate,
+      secret: input.secret ?? null,
+      ...(input.eventTypeId !== undefined ? { eventTypeCalId: input.eventTypeId } : {}),
+    });
+    return created as unknown as Webhook;
+  }
+
+  const validation = validateUrlForSSRFSync(input.subscriberUrl);
+  if (!validation.isValid) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: `Webhook URL is not allowed: ${validation.error}`,
+    });
+  }
+
+  const { webhookId: _webhookId, ...inputWithoutWebhookId } = input;
+  const webhookData: Prisma.WebhookCreateInput = {
+    id: v4(),
+    ...inputWithoutWebhookId,
+  };
+  if (input.platform && user.role !== "ADMIN") {
+    throw new TRPCError({ code: "UNAUTHORIZED" });
+  }
+
+  if (!input.platform && !input.eventTypeId) {
+    webhookData.user = { connect: { id: user.id } };
+  }
+
+  if (input.eventTypeId) {
+    const parentManagedEvt = await prisma.eventType.findFirst({
+      where: {
+        id: input.eventTypeId,
+        parentId: {
+          not: null,
+        },
+      },
+      select: {
+        parentId: true,
+        metadata: true,
+      },
+    });
+
+    if (parentManagedEvt?.parentId) {
+      const isLocked = !EventTypeMetaDataSchema.parse(parentManagedEvt.metadata)?.managedEventConfig
+        ?.unlockedFields?.webhooks;
+      if (isLocked) {
+        throw new TRPCError({ code: "UNAUTHORIZED" });
+      }
+    }
+  }
+
+  let newWebhook: Webhook;
+  try {
+    newWebhook = await prisma.webhook.create({
+      data: webhookData,
+    });
+  } catch (error) {
+    // Avoid printing raw prisma error on frontend
+    throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to create webhook" });
+  }
+
+  await updateTriggerForExistingBookings(newWebhook, [], newWebhook.eventTriggers);
+
+  return newWebhook;
+};

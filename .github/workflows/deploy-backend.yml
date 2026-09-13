@@ -1,0 +1,30 @@
+name: Deploy Convex backend
+
+on:
+  push:
+    branches: [standalone, main]
+    paths:
+      - "packages/**"
+      - ".github/workflows/deploy-backend.yml"
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Typecheck + test
+        run: |
+          pnpm --filter @teddessert/booking-backend typecheck
+          pnpm --filter @dibslist/scheduling-engine test
+      - name: Deploy to Convex (effervescent-dinosaur-191)
+        working-directory: packages/backend
+        env:
+          CONVEX_DEPLOY_KEY: ${{ secrets.CONVEX_DEPLOY_KEY }}
+        run: npx convex deploy --typecheck disable -y

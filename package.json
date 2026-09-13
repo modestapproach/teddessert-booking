@@ -1,0 +1,12 @@
+{
+  "name": "teddessert-booking",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.28.0",
+  "scripts": {
+    "backend:deploy": "pnpm --filter @teddessert/booking-backend deploy",
+    "backend:typecheck": "pnpm --filter @teddessert/booking-backend typecheck",
+    "test": "pnpm --recursive --if-present test"
+  }
+}

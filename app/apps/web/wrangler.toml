@@ -1,0 +1,29 @@
+name = "dibslist-book"
+main = ".open-next/worker.js"
+compatibility_date = "2025-05-05"
+compatibility_flags = ["nodejs_compat", "global_fetch_strictly_public"]
+account_id = "c322d9c7d547311102d1727fdf6c08eb"
+
+[assets]
+directory = ".open-next/assets"
+binding = "ASSETS"
+
+[[routes]]
+pattern = "book.dibslist.app/*"
+zone_name = "dibslist.app"
+
+[vars]
+NODE_ENV = "production"
+NEXT_TELEMETRY_DISABLED = "1"
+NEXT_PUBLIC_WEBAPP_URL = "https://book.dibslist.app"
+NEXT_PUBLIC_CONVEX_URL = "https://jovial-meadowlark-781.convex.cloud"
+NEXT_PUBLIC_CONVEX_SITE_URL = "https://jovial-meadowlark-781.convex.site"
+SKIP_DB_MIGRATIONS = "1"
+# Disables Next.js's getMiddlewareManifest() dynamic require() at runtime,
+# which causes 500s in Cloudflare Workers (opennextjs-cloudflare#1232).
+NEXT_PRIVATE_MINIMAL_MODE = "1"
+# NEXT_PUBLIC_VERCEL_USE_BOTID_IN_BOOKER must NOT be set
+
+# Secrets — set once via CLI, never committed:
+#   wrangler secret put NEXTAUTH_SECRET
+#   wrangler secret put CALENDSO_ENCRYPTION_KEY
