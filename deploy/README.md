@@ -1,5 +1,10 @@
 # Running `book.teddessert.com` on a small VPS
 
+> **This is the fallback.** The primary deployment is a Cloudflare Worker via
+> OpenNext (`.github/workflows/deploy-worker.yml`, see the root README). Use
+> this runbook only if the Worker path is ever unavailable and you need the
+> same app on a plain box.
+
 A small amd64 VPS **pulls and runs** the image; it never builds it. GitHub
 Actions (`.github/workflows/build-image.yml`) builds on every push to `main`
 that touches `app/**` and pushes `ghcr.io/modestapproach/teddessert-booking:latest`

@@ -8,8 +8,8 @@ domain.
 packages/scheduling-engine   pure availability / slot / ranking math (MIT, from cal.diy)
 packages/backend             Convex backend  → https://effervescent-dinosaur-191.convex.cloud
 app/                         Cal.com fork (real Cal.com UI, data layer on Convex) → book.teddessert.com
-deploy/                      what runs on the VPS (compose + cloudflared + runbook)
-.github/workflows            deploy-backend.yml (Convex)  ·  build-image.yml (Docker image → GHCR)
+deploy/                      fallback: run the container on any Linux box (compose + cloudflared + runbook)
+.github/workflows            deploy-backend.yml (Convex)  ·  deploy-worker.yml (Cloudflare Workers)  ·  build-image.yml (fallback image → GHCR)
 ```
 
 ## How it fits together
@@ -49,48 +49,58 @@ Env on the Convex deployment (already set): `GOOGLE_CLIENT_ID`,
 Optional: `EMAIL_API_KEY` + `EMAIL_FROM` (Brevo confirmations + .ics),
 `TWILIO_*` (SMS), `TURNSTILE_SECRET_KEY`, `STRIPE_BOOKING_WEBHOOK_SECRET`.
 
-### App (`app/`) — GHCR image, run on a small VPS
+### App (`app/`) — Cloudflare Workers via OpenNext
 
-The app is no longer on Cloudflare Containers (keeping a 6 GiB container warm
-ran ~$30–50/mo). It is a plain Docker image built in CI and run on a small
-amd64 VPS (~$4–8/mo), published through a Cloudflare Tunnel.
+The Next.js frontend runs as a Cloudflare Worker, the same way dibslist runs
+`book.dibslist.app`. No container and no box: per-request billing on the
+Workers plan. (Cloudflare *Containers*, the previous setup, cost ~$30–50/mo to
+keep a 6 GiB instance warm and is gone.)
 
 ```
-push to main (app/**) ──► GitHub Actions build ──► ghcr.io/modestapproach/teddessert-booking:latest
-                                                              │
-                                    VPS: docker compose pull && up -d
-                                                              │
-Internet ──► Cloudflare edge ──► cloudflared ──► 127.0.0.1:3000 ──► container
+push to main (app/**) ──► GitHub Actions: next build --webpack ──► opennextjs-cloudflare build ──► wrangler
+                                                                                                      │
+                                     Internet ──► book.teddessert.com (Worker Custom Domain) ◄────────┘
 ```
 
-- **Build** — `.github/workflows/build-image.yml`, on push to `main` touching
-  `app/**` and on `workflow_dispatch`. It pushes `:latest` and `:<sha>` to GHCR
-  using the built-in `GITHUB_TOKEN` (`packages: write`); **no repo secrets are
-  needed for the app build any more**. The VPS never builds — the cal.com
-  build wants ~6 GB of heap and far more disk than a $5 box has. Both sides
-  are amd64, so this is a single-arch build.
-- **Run** — everything the VPS needs is in [`deploy/`](deploy/):
-  `docker-compose.yml` (pull `:latest`, `restart: unless-stopped`, bind
-  `127.0.0.1:3000` only), `.env.example` (copy to `deploy/.env`, gitignored),
-  `cloudflared-config.yml`, and [`deploy/README.md`](deploy/README.md) — the
-  copy-pasteable first-boot runbook (provisioning + firewall, Docker install,
-  tunnel setup, systemd, verification, updates).
-- **Runtime env** lives in `deploy/.env` on the box, not in repo secrets:
-  `NEXTAUTH_SECRET`, `CALENDSO_ENCRYPTION_KEY`, `OWNER_PASSWORD`,
-  `OWNER_EMAIL` / `OWNER_NAME` / `OWNER_USERNAME`, the three `NEXT_PUBLIC_*`
-  URLs and `SKIP_DB_MIGRATIONS=1`. The `NEXT_PUBLIC_*` values are also baked at
-  build time by `app/Dockerfile`'s defaults — CI does not override them.
-- **Update** — `cd deploy && docker compose pull && docker compose up -d`.
+- **Deploy** — `.github/workflows/deploy-worker.yml`, on push to `main`
+  touching `app/**` and on `workflow_dispatch`. Config is
+  `app/apps/web/wrangler.toml`: Worker `teddessert-book`, `book.teddessert.com`
+  as a Custom Domain (Cloudflare owns the DNS record and certificate — nothing
+  to create by hand). After each deploy the workflow syncs the runtime secrets
+  into the Worker and smokes `/owner-login`.
+- **Repo secrets it needs:**
 
-`CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` are no longer used by CI; the
-only Cloudflare thing left is the tunnel's DNS record on the `teddessert.com`
-zone, created once with `cloudflared tunnel route dns`. Tunnel is free, so the
-Cloudflare cost of this setup is $0.
+  | secret | value |
+  | --- | --- |
+  | `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` | the account holding the `teddessert.com` zone; a token from the *Edit Cloudflare Workers* template plus DNS edit on the zone (the Custom Domain needs it — if the first deploy fails creating the domain, this is why) |
+  | `NEXTAUTH_SECRET` | random 32+ chars |
+  | `CALENDSO_ENCRYPTION_KEY` | random 32 chars |
+  | `OWNER_PASSWORD` | the dashboard password |
+  | `OWNER_EMAIL` / `OWNER_NAME` / `OWNER_USERNAME` | e.g. `you@…` / `Ted Dessert` / `ted` |
 
-**Why a VPS and not the LattePanda at home:** the Panda hosts things whose
-downtime hurts only the owner (Twenty, personal tooling). A public booking page
-fails *silently* when a home link or the power blips — nobody reports the
-booking they didn't make. A datacenter box for ~$5/mo is the right trade.
+- **Build details that are load-bearing** (each one is a build that failed):
+  - `next build --webpack`, not Turbopack (Next 16's default). The
+    Workers-specific `IgnorePlugin`s for `sharp` and `deasync` live in
+    `next.config.ts`'s `webpack()` hook, and Turbopack emits a hashed
+    `sharp-<hash>` alias that OpenNext's esbuild cannot resolve.
+  - `node:`-scheme imports that reach the client bundle
+    (`packages/i18n/next-i18next.config.js`, `Booker.tsx`) are prefix-stripped
+    in that same hook so Next's browser fallbacks resolve them; webpack rejects
+    the scheme outright.
+  - `@opennextjs/cloudflare` ≥ 1.20.3. Next 16's `proxy.ts` is
+    Node-runtime-only, and older OpenNext refuses to bundle it.
+  - `NEXT_PRIVATE_MINIMAL_MODE=1` at runtime (opennextjs-cloudflare#1232),
+    inherited from dibslist's config.
+- **Limits to keep in mind** — 64 MiB uncompressed Worker size, 128 MB memory
+  per isolate. The deploy workflow prints the bundle size on every run.
+
+**Fallback: the container.** `.github/workflows/build-image.yml` still builds
+`ghcr.io/modestapproach/teddessert-booking:latest` on the same trigger, and
+[`deploy/`](deploy/) has a compose file, tunnel config and runbook to run it on
+any amd64 Linux box behind a free Cloudflare Tunnel. Not the LattePanda: it
+hosts things whose downtime hurts only the owner (Twenty, personal tooling). A
+public booking page fails *silently* when a home link or the power blips —
+nobody reports the booking they didn't make.
 
 ## First run
 

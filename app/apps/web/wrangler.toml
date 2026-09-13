@@ -1,29 +1,44 @@
-name = "dibslist-book"
+# Cloudflare Workers deployment of the booking app via OpenNext — the same
+# path dibslist runs book.dibslist.app on. No container: `.open-next/worker.js`
+# is the Next.js server, static files are served from the ASSETS binding.
+#
+# Deployed by .github/workflows/deploy-worker.yml. Locally:
+#   cd apps/web && yarn next build --webpack && yarn opennextjs-cloudflare build --skipNextBuild && yarn wrangler deploy
+# (--webpack, not Turbopack: next.config's webpack() hook carries the
+# Workers-specific IgnorePlugins for sharp/deasync.)
+#
+# The account comes from CLOUDFLARE_ACCOUNT_ID in the environment (no
+# account_id here) and the auth token from CLOUDFLARE_API_TOKEN.
+
+name = "teddessert-book"
 main = ".open-next/worker.js"
-compatibility_date = "2025-05-05"
+compatibility_date = "2026-06-01"
 compatibility_flags = ["nodejs_compat", "global_fetch_strictly_public"]
-account_id = "c322d9c7d547311102d1727fdf6c08eb"
 
 [assets]
 directory = ".open-next/assets"
 binding = "ASSETS"
 
+# Custom Domain: Cloudflare creates the DNS record + certificate for this
+# hostname on deploy. The zone (teddessert.com) must be in the same account.
 [[routes]]
-pattern = "book.dibslist.app/*"
-zone_name = "dibslist.app"
+pattern = "book.teddessert.com"
+custom_domain = true
 
 [vars]
 NODE_ENV = "production"
 NEXT_TELEMETRY_DISABLED = "1"
-NEXT_PUBLIC_WEBAPP_URL = "https://book.dibslist.app"
-NEXT_PUBLIC_CONVEX_URL = "https://jovial-meadowlark-781.convex.cloud"
-NEXT_PUBLIC_CONVEX_SITE_URL = "https://jovial-meadowlark-781.convex.site"
+NEXT_PUBLIC_WEBAPP_URL = "https://book.teddessert.com"
+NEXT_PUBLIC_CONVEX_URL = "https://effervescent-dinosaur-191.convex.cloud"
+NEXT_PUBLIC_CONVEX_SITE_URL = "https://effervescent-dinosaur-191.convex.site"
+NEXT_PUBLIC_APP_NAME = "Ted Dessert"
 SKIP_DB_MIGRATIONS = "1"
 # Disables Next.js's getMiddlewareManifest() dynamic require() at runtime,
 # which causes 500s in Cloudflare Workers (opennextjs-cloudflare#1232).
 NEXT_PRIVATE_MINIMAL_MODE = "1"
 # NEXT_PUBLIC_VERCEL_USE_BOTID_IN_BOOKER must NOT be set
 
-# Secrets — set once via CLI, never committed:
-#   wrangler secret put NEXTAUTH_SECRET
-#   wrangler secret put CALENDSO_ENCRYPTION_KEY
+# Secrets are synced from the repository secrets of the same names by the
+# deploy workflow (`wrangler secret bulk`), never committed:
+#   NEXTAUTH_SECRET  CALENDSO_ENCRYPTION_KEY  OWNER_PASSWORD
+#   OWNER_EMAIL  OWNER_NAME  OWNER_USERNAME

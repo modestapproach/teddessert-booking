@@ -279,6 +279,17 @@ const nextConfig = (phase: string): NextConfig => {
           // in the dependency graph even as an unresolved external.
           new wp.IgnorePlugin({ resourceRegExp: /^deasync$/ }),
         );
+      } else {
+        // `node:path` / `node:process` reach the client bundle (next-i18next
+        // config via packages/lib/i18n.ts; Booker.tsx). Turbopack maps the
+        // `node:` scheme to browser shims; webpack rejects it outright
+        // (UnhandledSchemeError). Strip the prefix so Next's own client
+        // fallbacks (path-browserify, process polyfill) resolve them.
+        config.plugins.push(
+          new wp.NormalModuleReplacementPlugin(/^node:/, (resource: { request: string }) => {
+            resource.request = resource.request.replace(/^node:/, "");
+          }),
+        );
       }
       return config;
     },
