@@ -1,4 +1,4 @@
-# LattePanda 3 Delta — runs the prebuilt booking image from GHCR.
+# Small VPS — runs the prebuilt booking image from GHCR.
 # The image is built by .github/workflows/build-image.yml; this box only pulls.
 #
 #   docker compose pull && docker compose up -d
@@ -20,7 +20,7 @@ services:
       retries: 5
       start_period: 90s
     logging:
-      # Cap the json log file — the eMMC is small and slow to wear out.
+      # Cap the json log file so a chatty week can't fill a 20 GB disk.
       driver: json-file
       options:
         max-size: "10m"

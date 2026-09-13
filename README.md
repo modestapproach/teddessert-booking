@@ -8,7 +8,7 @@ domain.
 packages/scheduling-engine   pure availability / slot / ranking math (MIT, from cal.diy)
 packages/backend             Convex backend  → https://effervescent-dinosaur-191.convex.cloud
 app/                         Cal.com fork (real Cal.com UI, data layer on Convex) → book.teddessert.com
-deploy/                      what runs on the LattePanda (compose + cloudflared + runbook)
+deploy/                      what runs on the VPS (compose + cloudflared + runbook)
 .github/workflows            deploy-backend.yml (Convex)  ·  build-image.yml (Docker image → GHCR)
 ```
 
@@ -49,16 +49,16 @@ Env on the Convex deployment (already set): `GOOGLE_CLIENT_ID`,
 Optional: `EMAIL_API_KEY` + `EMAIL_FROM` (Brevo confirmations + .ics),
 `TWILIO_*` (SMS), `TURNSTILE_SECRET_KEY`, `STRIPE_BOOKING_WEBHOOK_SECRET`.
 
-### App (`app/`) — GHCR image, run on a LattePanda
+### App (`app/`) — GHCR image, run on a small VPS
 
 The app is no longer on Cloudflare Containers (keeping a 6 GiB container warm
-ran ~$30–50/mo). It is a plain Docker image built in CI and run on a LattePanda
-3 Delta at home, published through a Cloudflare Tunnel.
+ran ~$30–50/mo). It is a plain Docker image built in CI and run on a small
+amd64 VPS (~$4–8/mo), published through a Cloudflare Tunnel.
 
 ```
 push to main (app/**) ──► GitHub Actions build ──► ghcr.io/modestapproach/teddessert-booking:latest
                                                               │
-                                    LattePanda: docker compose pull && up -d
+                                    VPS: docker compose pull && up -d
                                                               │
 Internet ──► Cloudflare edge ──► cloudflared ──► 127.0.0.1:3000 ──► container
 ```
@@ -66,15 +66,15 @@ Internet ──► Cloudflare edge ──► cloudflared ──► 127.0.0.1:300
 - **Build** — `.github/workflows/build-image.yml`, on push to `main` touching
   `app/**` and on `workflow_dispatch`. It pushes `:latest` and `:<sha>` to GHCR
   using the built-in `GITHUB_TOKEN` (`packages: write`); **no repo secrets are
-  needed for the app build any more**. The Panda never builds — too little disk
-  and RAM. Both sides are amd64, so this is a single-arch build.
-- **Run** — everything the Panda needs is in [`deploy/`](deploy/):
+  needed for the app build any more**. The VPS never builds — the cal.com
+  build wants ~6 GB of heap and far more disk than a $5 box has. Both sides
+  are amd64, so this is a single-arch build.
+- **Run** — everything the VPS needs is in [`deploy/`](deploy/):
   `docker-compose.yml` (pull `:latest`, `restart: unless-stopped`, bind
   `127.0.0.1:3000` only), `.env.example` (copy to `deploy/.env`, gitignored),
   `cloudflared-config.yml`, and [`deploy/README.md`](deploy/README.md) — the
-  copy-pasteable first-boot runbook (Docker install, moving Docker's data-root
-  to an external SSD so the 64 GB eMMC survives, tunnel setup, systemd,
-  verification).
+  copy-pasteable first-boot runbook (provisioning + firewall, Docker install,
+  tunnel setup, systemd, verification, updates).
 - **Runtime env** lives in `deploy/.env` on the box, not in repo secrets:
   `NEXTAUTH_SECRET`, `CALENDSO_ENCRYPTION_KEY`, `OWNER_PASSWORD`,
   `OWNER_EMAIL` / `OWNER_NAME` / `OWNER_USERNAME`, the three `NEXT_PUBLIC_*`
@@ -84,7 +84,13 @@ Internet ──► Cloudflare edge ──► cloudflared ──► 127.0.0.1:300
 
 `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` are no longer used by CI; the
 only Cloudflare thing left is the tunnel's DNS record on the `teddessert.com`
-zone, created once with `cloudflared tunnel route dns`.
+zone, created once with `cloudflared tunnel route dns`. Tunnel is free, so the
+Cloudflare cost of this setup is $0.
+
+**Why a VPS and not the LattePanda at home:** the Panda hosts things whose
+downtime hurts only the owner (Twenty, personal tooling). A public booking page
+fails *silently* when a home link or the power blips — nobody reports the
+booking they didn't make. A datacenter box for ~$5/mo is the right trade.
 
 ## First run
 

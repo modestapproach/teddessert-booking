@@ -1,4 +1,4 @@
-# Template for /etc/cloudflared/config.yml on the LattePanda.
+# Template for /etc/cloudflared/config.yml on the VPS.
 #
 # Replace <TUNNEL-UUID> with the id printed by `cloudflared tunnel create book`
 # (also the basename of the credentials JSON it writes). If you run cloudflared
@@ -8,7 +8,7 @@
 tunnel: <TUNNEL-UUID>
 credentials-file: /etc/cloudflared/<TUNNEL-UUID>.json
 
-# Prefer graceful reconnects over a hard drop when the Panda's link flaps.
+# Prefer graceful reconnects over a hard drop if the link flaps.
 originRequest:
   connectTimeout: 30s
   noHappyEyeballs: true

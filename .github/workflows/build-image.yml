@@ -1,7 +1,7 @@
 name: Build booking image (GHCR)
 
 # Builds the Cal.com-fork Docker image on GitHub's runner and pushes it to
-# GHCR. The LattePanda that runs the app only ever pulls — it has neither the
+# GHCR. The VPS that runs the app only ever pulls — it has neither the
 # disk nor the RAM to build this image. Both are amd64, so this is a plain
 # single-arch build.
 #
