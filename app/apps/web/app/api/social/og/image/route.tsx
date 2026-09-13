@@ -6,10 +6,7 @@ import { z, ZodError } from "zod";
 import { Meeting, App, Generic, getOGImageVersion } from "@calcom/lib/OgImages";
 import { WEBAPP_URL } from "@calcom/lib/constants";
 
-// No `export const runtime = "edge"` here: the app deploys to Cloudflare
-// Workers via @opennextjs/cloudflare, which runs everything on the Node.js
-// runtime and refuses to bundle edge-runtime routes ("cannot use the edge
-// runtime"). next/og's ImageResponse works on Node.
+export const runtime = "edge";
 
 const meetingSchema = z.object({
   imageType: z.literal("meeting"),

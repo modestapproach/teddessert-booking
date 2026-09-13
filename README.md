@@ -8,8 +8,8 @@ domain.
 packages/scheduling-engine   pure availability / slot / ranking math (MIT, from cal.diy)
 packages/backend             Convex backend  → https://effervescent-dinosaur-191.convex.cloud
 app/                         Cal.com fork (real Cal.com UI, data layer on Convex) → book.teddessert.com
-deploy/                      fallback: run the container on any Linux box (compose + cloudflared + runbook)
-.github/workflows            deploy-backend.yml (Convex)  ·  deploy-worker.yml (Cloudflare Workers)  ·  build-image.yml (fallback image → GHCR)
+deploy/                      fallback: run the same container on any Linux box (compose + cloudflared + runbook)
+.github/workflows            deploy-backend.yml (Convex)  ·  deploy-app.yml (Cloudflare Containers)  ·  build-image.yml (manual fallback image → GHCR)
 ```
 
 ## How it fits together
@@ -49,90 +49,89 @@ Env on the Convex deployment (already set): `GOOGLE_CLIENT_ID`,
 Optional: `EMAIL_API_KEY` + `EMAIL_FROM` (Brevo confirmations + .ics),
 `TWILIO_*` (SMS), `TURNSTILE_SECRET_KEY`, `STRIPE_BOOKING_WEBHOOK_SECRET`.
 
-### App (`app/`) — Cloudflare Workers via OpenNext
+### App (`app/`) — Cloudflare Containers
 
-The Next.js frontend runs as a Cloudflare Worker, the same way dibslist runs
-`book.dibslist.app`. No container and no box: per-request billing on the
-Workers plan. (Cloudflare *Containers*, the previous setup, cost ~$30–50/mo to
-keep a 6 GiB instance warm and is gone.)
+The Next.js frontend runs as a Docker container on Cloudflare, fronted by a
+Worker that proxies to it (`app/src/index.ts`) and owns the route
+`book.teddessert.com/*`. The data layer stays on Convex; the container is
+stateless and disposable.
 
 ```
-push to main (app/**) ──► GitHub Actions: next build --webpack ──► opennextjs-cloudflare build ──► wrangler
-                                                                                                      │
-                                     Internet ──► book.teddessert.com (Worker Custom Domain) ◄────────┘
+push to main (app/**) ──► GitHub Actions ──► wrangler deploy (builds the Dockerfile,
+                                              pushes to CF's managed registry)
+                                                          │
+Internet ──► Worker (book.teddessert.com) ──► Container :3000 ──► Convex
 ```
 
-- **Deploy** — `.github/workflows/deploy-worker.yml`, on push to `main`
-  touching `app/**` and on `workflow_dispatch`. Config is
-  `app/apps/web/wrangler.toml`: Worker `teddessert-book`, `book.teddessert.com`
-  as a Custom Domain (Cloudflare owns the DNS record and certificate — nothing
-  to create by hand). After each deploy the workflow syncs the runtime secrets
-  into the Worker and smokes `/owner-login`.
-- **Repo secrets it needs:**
+- **Deploy** — `.github/workflows/deploy-app.yml`, on push to `main` touching
+  `app/**` and on `workflow_dispatch`. It checks the eight repo secrets exist,
+  frees runner disk (the cal build overruns the default ~14 GB), then
+  `wrangler deploy` builds `app/Dockerfile` and syncs the runtime secrets into
+  the Worker. Config is `app/wrangler.toml`.
+- **Repo secrets it needs** (all eight, or the deploy stops at the preflight):
 
   | secret | value |
   | --- | --- |
-  | `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` | the account holding the `teddessert.com` zone; a token from the *Edit Cloudflare Workers* template plus DNS edit on the zone (the Custom Domain needs it — if the first deploy fails creating the domain, this is why) |
-  | `NEXTAUTH_SECRET` | random 32+ chars |
-  | `CALENDSO_ENCRYPTION_KEY` | random 32 chars |
+  | `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` | the account holding the `teddessert.com` zone |
+  | `NEXTAUTH_SECRET` | random 32+ chars — `openssl rand -hex 32` |
+  | `CALENDSO_ENCRYPTION_KEY` | random 32 chars — `openssl rand -hex 16` |
   | `OWNER_PASSWORD` | the dashboard password |
   | `OWNER_EMAIL` / `OWNER_NAME` / `OWNER_USERNAME` | e.g. `you@…` / `Ted Dessert` / `ted` |
 
-- **Build details that are load-bearing** (each one is a build that failed):
-  - `next build --webpack`, not Turbopack (Next 16's default). The
-    Workers-specific `IgnorePlugin`s for `sharp` and `deasync` live in
-    `next.config.ts`'s `webpack()` hook, and Turbopack emits a hashed
-    `sharp-<hash>` alias that OpenNext's esbuild cannot resolve.
-  - `node:`-scheme imports that reach the client bundle
-    (`packages/i18n/next-i18next.config.js`, `Booker.tsx`) are prefix-stripped
-    in that same hook so Next's browser fallbacks resolve them; webpack rejects
-    the scheme outright.
-  - `@opennextjs/cloudflare` ≥ 1.20.3. Next 16's `proxy.ts` is
-    Node-runtime-only, and older OpenNext refuses to bundle it.
-  - `NEXT_PRIVATE_MINIMAL_MODE=1` at runtime (opennextjs-cloudflare#1232),
-    inherited from dibslist's config.
-  - `outputFileTracingRoot` is a **top-level** `next.config.ts` key. Under
-    `experimental` (where upstream had it) Next 16 silently ignores it, the
-    trace root falls back to `apps/web`, and hoisted workspace packages
-    (`uncrypto` was the first) are missing from the server tree OpenNext
-    copies. Same trap for the Docker standalone build.
-  - `yarn copy-app-store-static` before `next build`. Turbo's `build` task
-    depends on it; a raw `next build` (the workflow, the Dockerfile) does not,
-    and `app/api/social/og/image` imports the `svg-hashes.json` it generates.
-  - `sharp` is aliased to an empty module in the client-and-server webpack
-    config rather than ignored: `IgnorePlugin` makes `require("sharp")` throw
-    at load, and `/api/avatar/[uuid]` loads it at module level, which kills
-    page-data collection. Consequence on Workers: that avatar route fails
-    when called (sharp is native and cannot run there). It works in the
-    container.
-  - No route may declare `export const runtime = "edge"`. The Cloudflare
-    adapter runs everything on the Node.js runtime and refuses to bundle edge
-    routes ("cannot use the edge runtime"). `app/api/social/og/image` had it;
-    `next/og` works on Node.
-  - `open-next.config.ts` sets `cloudflare.useWorkerdCondition: false`. By
-    default OpenNext bundles with esbuild's `workerd` export condition, which
-    resolves packages that declare it (`@sentry/nextjs`, `uncrypto`,
-    `node-fetch-native`, …) to edge/web builds that Next's file trace never
-    copied — "Could not resolve", 41 errors for Sentry alone. The flag makes
-    esbuild resolve the files the trace copied. It is the escape hatch
-    OpenNext's own source documents for this mismatch; per-package
-    `outputFileTracingIncludes` was tried and works, but is whack-a-mole
-    against an unknown list.
-  - `superagent-proxy` is a two-line stub package (`apps/web/stubs/`)
-    installed via `file:`. `rest-facade` requires it lazily and it is never
-    installed for real; `rest-facade` is a traced dependency bundled by
-    esbuild, not webpack, so a webpack alias does not reach it. The real
-    plugin would drag the whole `proxy-agent` tree into the Worker.
-- **Limits to keep in mind** — 64 MiB uncompressed Worker size, 128 MB memory
-  per isolate. The deploy workflow prints the bundle size on every run.
+  Fresh values are fine for the last six — nothing durable is encrypted with
+  them. Bookings, availability and Google tokens live in Convex.
 
-**Fallback: the container.** `.github/workflows/build-image.yml` still builds
-`ghcr.io/modestapproach/teddessert-booking:latest` on the same trigger, and
-[`deploy/`](deploy/) has a compose file, tunnel config and runbook to run it on
-any amd64 Linux box behind a free Cloudflare Tunnel. Not the LattePanda: it
-hosts things whose downtime hurts only the owner (Twenty, personal tooling). A
-public booking page fails *silently* when a home link or the power blips —
-nobody reports the booking they didn't make.
+#### What it costs, and the one knob that decides
+
+Cloudflare bills a container **only while it is awake**: $0.0000025 per
+GiB-second of memory, plus a negligible amount for disk, and CPU on actual use.
+Requests and bandwidth are rounding errors for a personal booking page. So the
+bill is almost exactly *awake hours × instance memory*:
+
+| instance | awake 24/7 | awake ~3 h/day | awake ~1 h/day |
+| --- | --- | --- | --- |
+| `standard-1` (4 GiB) — current | ~$28/mo | ~$3.4/mo | ~$1.1/mo |
+| `standard-2` (6 GiB) — the old setting | ~$41/mo | ~$5.0/mo | ~$1.7/mo |
+
+The knob is **`sleepAfter` in `app/src/index.ts`**, not the instance type. It was `"2h"`, which meant one morning visit kept 6 GiB warm
+until lunchtime and any trickle of traffic never let it sleep — that is how
+this reached ~$40/mo. It is now **`"15m"`**: long enough for a booking session
+(browse slots → confirm), short enough that a quiet day costs cents.
+
+**The trade-off is real**: the first visitor after a quiet spell waits ~10–20 s
+while the container and Next boot. If a lost booking matters more than ~$25/mo,
+raise `sleepAfter` (or go to a small always-on VPS — see the fallback below).
+
+#### Build details that are load-bearing
+
+- `outputFileTracingRoot` is a **top-level** `next.config.ts` key. Under
+  `experimental` (where upstream cal.com has it) Next 16 silently ignores it,
+  the trace root falls back to `apps/web`, and the standalone server ships
+  without hoisted workspace dependencies.
+- `yarn copy-app-store-static` runs before `next build` in the Dockerfile.
+  Turbo's `build` task depends on it; a bare `next build` does not, and
+  `app/api/social/og/image` imports the `svg-hashes.json` it generates.
+
+#### Rejected: Cloudflare Workers (OpenNext)
+
+Running the app *inside* a Worker via `@opennextjs/cloudflare` does not work
+for this codebase and is not worth retrying. It builds only after seven
+separate fixes (`--webpack` instead of Turbopack, `node:`-scheme stripping, a
+sharp stub, dropping `runtime = "edge"`, `useWorkerdCondition: false`, a
+`superagent-proxy` stub, the tracing-root fix above) — and the result is a
+**167.7 MiB** `worker.js` against Cloudflare's **64 MiB** limit, 2.6× over and
+already minified, plus a 37 MiB app-store asset over the 25 MiB per-file cap.
+The upstream dibslist repo carries an OpenNext config too; it has never been
+deployed and cannot build as committed.
+
+#### Fallback: the same image anywhere
+
+`.github/workflows/build-image.yml` (manual, `workflow_dispatch`) builds the
+identical Dockerfile and pushes `ghcr.io/modestapproach/teddessert-booking`.
+[`deploy/`](deploy/) has a compose file, cloudflared config and runbook to run
+it on any amd64 Linux box behind a free Cloudflare Tunnel — ~$4–8/mo on a small
+VPS, always warm, no cold starts. Use it if the sleep latency proves annoying,
+or to pin and roll back to a specific `:<sha>`.
 
 ## First run
 

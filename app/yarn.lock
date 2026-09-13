@@ -4157,7 +4157,7 @@ __metadata:
     "@next-auth/prisma-adapter": "npm:1.0.4"
     "@next/bundle-analyzer": "npm:16.1.5"
     "@next/third-parties": "npm:14.2.5"
-    "@opennextjs/cloudflare": "npm:^1.20.6"
+    "@opennextjs/cloudflare": "npm:latest"
     "@playwright/test": "npm:1.57.0"
     "@prisma/nextjs-monorepo-workaround-plugin": "npm:6.16.1"
     "@radix-ui/react-avatar": "npm:1.1.3"
@@ -4276,7 +4276,6 @@ __metadata:
     short-uuid: "npm:4.2.0"
     sonner: "npm:1.7.4"
     stripe: "npm:9.16.0"
-    superagent-proxy: "file:./stubs/superagent-proxy"
     superjson: "npm:1.9.1"
     tailwindcss: "npm:4.1.17"
     ts-node: "npm:10.9.2"
@@ -10748,9 +10747,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@opennextjs/aws@npm:4.1.4":
-  version: 4.1.4
-  resolution: "@opennextjs/aws@npm:4.1.4"
+"@opennextjs/aws@npm:4.0.2":
+  version: 4.0.2
+  resolution: "@opennextjs/aws@npm:4.0.2"
   dependencies:
     "@ast-grep/napi": "npm:^0.40.5"
     "@aws-sdk/client-cloudfront": "npm:3.984.0"
@@ -10770,20 +10769,20 @@ __metadata:
     urlpattern-polyfill: "npm:^10.1.0"
     yaml: "npm:^2.8.1"
   peerDependencies:
-    next: ">=15.5.24 <16 || >=16.3.3"
+    next: ">=15.5.18 <16 || >=16.2.6"
   bin:
     open-next: dist/index.js
-  checksum: 10/2fd393c2ed71fd2ebbe4ae36622e45e38517573eaf3d79f62dc2a3b7a8df3e4e64a5a21ff2fc949a627fef0e23b44b0484ed7eb13a3a9eaced306c2df2d54db3
+  checksum: 10/8aa9079a6e8c3ee99c7bc5910262f3fc17df2a9dd053116e38d8a28d2180618cc0ca2db9a0fce429c1857a700ae53df54c59d7c1de66eb5dfb8f4e7ae83dcc56
   languageName: node
   linkType: hard
 
-"@opennextjs/cloudflare@npm:^1.20.6":
-  version: 1.20.6
-  resolution: "@opennextjs/cloudflare@npm:1.20.6"
+"@opennextjs/cloudflare@npm:latest":
+  version: 1.19.11
+  resolution: "@opennextjs/cloudflare@npm:1.19.11"
   dependencies:
     "@ast-grep/napi": "npm:^0.40.5"
     "@dotenvx/dotenvx": "npm:1.31.0"
-    "@opennextjs/aws": "npm:4.1.4"
+    "@opennextjs/aws": "npm:4.0.2"
     ci-info: "npm:^4.2.0"
     cloudflare: "npm:^4.4.1"
     comment-json: "npm:^4.5.1"
@@ -10792,15 +10791,11 @@ __metadata:
     ts-tqdm: "npm:^0.8.6"
     yargs: "npm:^18.0.0"
   peerDependencies:
-    next: ">=15.5.24 <16 || >=16.3.3"
-    rclone.js: ^0.6.6
-    wrangler: ^4.125.0
-  peerDependenciesMeta:
-    rclone.js:
-      optional: true
+    next: ">=15.5.18 <16 || >=16.2.6"
+    wrangler: ^4.86.0
   bin:
     opennextjs-cloudflare: dist/cli/index.js
-  checksum: 10/65db7fc0f3f468acb6aa968266eafa6ef7784bd92e5cdce309b5060366a78ce8edbc6a0800f079dbb51c86db6a31162230ca00e2c0d55ef85fa0f71ce955754b
+  checksum: 10/a40286e08e138d4e24e2c895b99e846b90c0768cd920df7111786168abfadc5632e3fbf9fbd82a32d46ba09253a43a49cd459a17a8bee259e9d0b2bde4c7bf3e
   languageName: node
   linkType: hard
 
@@ -40929,13 +40924,6 @@ __metadata:
     sucrase: bin/sucrase
     sucrase-node: bin/sucrase-node
   checksum: 10/b64d154a7a7eaa4b39668c3124bd08cd505f683d36ac4fb94def6491fb3af155b24b6e41b55011e38582e7d59c440af79ffba8709f3da78aeedf2f07b6d51d84
-  languageName: node
-  linkType: hard
-
-"superagent-proxy@file:./stubs/superagent-proxy::locator=%40calcom%2Fweb%40workspace%3Aapps%2Fweb":
-  version: 0.0.0-stub
-  resolution: "superagent-proxy@file:./stubs/superagent-proxy#./stubs/superagent-proxy::hash=d843f6&locator=%40calcom%2Fweb%40workspace%3Aapps%2Fweb"
-  checksum: 10/b0da746fe5cd66f02503ece32086b599997bbdce875a35931bfac2b5074b42346bf8b7499cea9230f6c1459191bbbb299a464e2b6808ee67e883d210412bf643
   languageName: node
   linkType: hard
 

@@ -1,9 +1,10 @@
 # Running `book.teddessert.com` on a small VPS
 
-> **This is the fallback.** The primary deployment is a Cloudflare Worker via
-> OpenNext (`.github/workflows/deploy-worker.yml`, see the root README). Use
-> this runbook only if the Worker path is ever unavailable and you need the
-> same app on a plain box.
+> **This is the fallback.** The primary deployment is Cloudflare Containers
+> (`.github/workflows/deploy-app.yml`, see the root README), which builds the
+> same Dockerfile. Use this runbook when you want the app always warm with no
+> cold starts, or off Cloudflare entirely. The image it pulls comes from
+> `build-image.yml`, which is manual — run it once before following this.
 
 A small amd64 VPS **pulls and runs** the image; it never builds it. GitHub
 Actions (`.github/workflows/build-image.yml`) builds on every push to `main`

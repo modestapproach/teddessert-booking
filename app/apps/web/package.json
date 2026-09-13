@@ -153,13 +153,14 @@
     "zod": "3.25.76"
   },
   "devDependencies": {
+    "@opennextjs/cloudflare": "latest",
+    "wrangler": "latest",
     "@babel/core": "7.26.10",
     "@biomejs/biome": "2.3.10",
     "@calcom/config": "workspace:*",
     "@calcom/testing": "workspace:*",
     "@calcom/types": "workspace:*",
     "@microsoft/microsoft-graph-types-beta": "0.15.0-preview",
-    "@opennextjs/cloudflare": "^1.20.6",
     "@playwright/test": "1.57.0",
     "@tailwindcss/postcss": "4.1.15",
     "@testing-library/react": "13.3.0",
@@ -196,12 +197,10 @@
     "node-html-parser": "6.1.13",
     "node-mocks-http": "1.16.2",
     "postcss": "8.5.6",
-    "superagent-proxy": "file:./stubs/superagent-proxy",
     "tailwindcss": "4.1.17",
     "ts-node": "10.9.2",
     "turbo": "2.5.5",
-    "typescript": "5.9.3",
-    "wrangler": "latest"
+    "typescript": "5.9.3"
   },
   "nextBundleAnalysis": {
     "budget": 358400,

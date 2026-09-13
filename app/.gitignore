@@ -117,6 +117,3 @@ agents/devin-knowledge.json
 
 # pagefind
 _pagefind/
-
-# OpenNext (Cloudflare Workers) build output
-.open-next

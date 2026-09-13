@@ -229,14 +229,11 @@ const nextConfig = (phase: string): NextConfig => {
       ignoreBuildErrors: true,
     },
     output: process.env.BUILD_STANDALONE === "true" ? "standalone" : undefined,
-    // Required for standalone output (and OpenNext's server tree) to include
-    // packages/* and hoisted node_modules from the workspace root. Top-level
-    // since Next 15 — under `experimental` it is silently ignored.
-    outputFileTracingRoot: path.join(__dirname, "../../"),
     serverExternalPackages: [
       "deasync",
       "http-cookie-agent",
       "rest-facade",
+      "superagent-proxy",
       "superagent",
       "formidable",
       "@boxyhq/saml-jackson",
@@ -244,6 +241,11 @@ const nextConfig = (phase: string): NextConfig => {
       "@prisma/client",
       ".prisma/client",
     ],
+    // Required for standalone output to include packages/* from the workspace
+    // root. Top-level since Next 15 — under `experimental` (where upstream has
+    // it) Next 16 silently ignores it, the trace root falls back to apps/web,
+    // and the standalone server is missing hoisted workspace dependencies.
+    outputFileTracingRoot: path.join(__dirname, "../../"),
     experimental: {
       optimizePackageImports: ["@calcom/ui"],
     },
@@ -273,28 +275,12 @@ const nextConfig = (phase: string): NextConfig => {
         // sharp uses native libvips binaries that cannot run in Cloudflare Workers.
         // images.unoptimized:true already disables runtime usage; this keeps it
         // out of the server bundle entirely to avoid esbuild resolution errors.
-        // An empty module, not IgnorePlugin: IgnorePlugin makes require("sharp")
-        // throw at load, and /api/avatar/[uuid] loads it at module level, which
-        // kills `next build`'s page-data collection. With alias:false the route
-        // builds and only fails if actually called (it cannot work on Workers
-        // either way — sharp is native).
-        config.resolve.alias = { ...config.resolve.alias, sharp: false };
         config.plugins.push(
+          new wp.IgnorePlugin({ resourceRegExp: /^sharp$/ }),
           // deasync is a libuv native addon — also unbundleable in Workers.
           // It's already in serverExternalPackages but this stops it appearing
           // in the dependency graph even as an unresolved external.
           new wp.IgnorePlugin({ resourceRegExp: /^deasync$/ }),
-        );
-      } else {
-        // `node:path` / `node:process` reach the client bundle (next-i18next
-        // config via packages/lib/i18n.ts; Booker.tsx). Turbopack maps the
-        // `node:` scheme to browser shims; webpack rejects it outright
-        // (UnhandledSchemeError). Strip the prefix so Next's own client
-        // fallbacks (path-browserify, process polyfill) resolve them.
-        config.plugins.push(
-          new wp.NormalModuleReplacementPlugin(/^node:/, (resource: { request: string }) => {
-            resource.request = resource.request.replace(/^node:/, "");
-          }),
         );
       }
       return config;

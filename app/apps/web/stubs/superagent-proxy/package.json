@@ -1,8 +1,0 @@
-{
-  "name": "superagent-proxy",
-  "version": "0.0.0-stub",
-  "private": true,
-  "description": "Empty stand-in for the optional superagent-proxy plugin that rest-facade tries to require. Never installed for real: the Worker bundle (OpenNext's esbuild) must be able to resolve it, and the real package would pull the whole proxy-agent tree in.",
-  "main": "index.js",
-  "license": "MIT"
-}
