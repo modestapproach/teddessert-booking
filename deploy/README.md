@@ -110,26 +110,31 @@ chmod 600 .env
 
 > `deploy/.env` is gitignored. Keep it off GitHub.
 
-## 4. Authenticate to GHCR (only if the package is private)
+## 4. GHCR authentication — not needed today
 
-The GHCR package inherits the repository's visibility. If the repo is private,
-log in once on the Panda with a **classic** personal access token that has the
-`read:packages` scope (github.com → Settings → Developer settings → Tokens):
+The package is **public** (it inherits the repository's visibility, and
+`modestapproach/teddessert-booking` is public), so the Panda can pull anonymously.
+Verified: an unauthenticated manifest fetch of
+`ghcr.io/modestapproach/teddessert-booking:latest` returns 200. Skip to step 5.
+
+It only becomes an issue if the repo (or just the package) is ever made
+private. Then log in once on the Panda with a **classic** personal access token
+carrying the `read:packages` scope (github.com → Settings → Developer settings →
+Tokens):
 
 ```bash
 echo "<YOUR_PAT>" | docker login ghcr.io -u <your-github-username> --password-stdin
 ```
 
-Alternatively make just the package public — GitHub → Packages →
-`teddessert-booking` → Package settings → Change visibility → Public — and skip
-the login. Nothing secret is baked into the image (the `NEXT_PUBLIC_*` build
-args are public URLs), but the app source is inside it.
+Nothing secret is baked into the image — the `NEXT_PUBLIC_*` build args are the
+public URLs — but the app source is inside it, which is the thing to weigh if
+you are deciding on visibility.
 
 ## 5. Pull and start
 
 ```bash
 cd ~/teddessert-booking/deploy
-docker compose pull
+docker compose pull             # ~175 MiB compressed, a minute or two
 docker compose up -d
 docker compose logs -f          # Ctrl-C once you see the Next.js "Ready" line
 ```
@@ -256,7 +261,7 @@ IMAGE_SHA=<sha> docker run --rm --env-file .env -p 127.0.0.1:3000:3000 \
 
 | symptom | check |
 | --- | --- |
-| `docker compose pull` → `denied` | GHCR login (step 4), or make the package public |
+| `docker compose pull` → `denied` | the package went private — GHCR login (step 4) |
 | container restarts in a loop | `docker compose logs --tail=200`; usually a missing var in `.env` |
 | 502 from Cloudflare | container down, or cloudflared pointing at the wrong port: `curl -sI localhost:3000/owner-login` |
 | tunnel connects but 404 | hostname in `/etc/cloudflared/config.yml` does not match the DNS record |
