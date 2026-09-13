@@ -1,0 +1,20 @@
+# Template for /etc/cloudflared/config.yml on the LattePanda.
+#
+# Replace <TUNNEL-UUID> with the id printed by `cloudflared tunnel create book`
+# (also the basename of the credentials JSON it writes). If you run cloudflared
+# as root via the systemd service, the credentials file it wrote to
+# ~/.cloudflared/ must be copied to /etc/cloudflared/ — see deploy/README.md.
+
+tunnel: <TUNNEL-UUID>
+credentials-file: /etc/cloudflared/<TUNNEL-UUID>.json
+
+# Prefer graceful reconnects over a hard drop when the Panda's link flaps.
+originRequest:
+  connectTimeout: 30s
+  noHappyEyeballs: true
+
+ingress:
+  - hostname: book.teddessert.com
+    service: http://localhost:3000
+  # Everything else gets a 404 — this tunnel serves exactly one hostname.
+  - service: http_status:404

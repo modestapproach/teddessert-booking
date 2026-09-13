@@ -8,7 +8,8 @@ domain.
 packages/scheduling-engine   pure availability / slot / ranking math (MIT, from cal.diy)
 packages/backend             Convex backend  → https://effervescent-dinosaur-191.convex.cloud
 app/                         Cal.com fork (real Cal.com UI, data layer on Convex) → book.teddessert.com
-.github/workflows            deploy-backend.yml (Convex)  ·  deploy-app.yml (Cloudflare Containers)
+deploy/                      what runs on the LattePanda (compose + cloudflared + runbook)
+.github/workflows            deploy-backend.yml (Convex)  ·  build-image.yml (Docker image → GHCR)
 ```
 
 ## How it fits together
@@ -48,20 +49,42 @@ Env on the Convex deployment (already set): `GOOGLE_CLIENT_ID`,
 Optional: `EMAIL_API_KEY` + `EMAIL_FROM` (Brevo confirmations + .ics),
 `TWILIO_*` (SMS), `TURNSTILE_SECRET_KEY`, `STRIPE_BOOKING_WEBHOOK_SECRET`.
 
-### App (`app/`, Cloudflare Workers + Containers)
-CI does this on push to `app/**`. Repo secrets it needs:
+### App (`app/`) — GHCR image, run on a LattePanda
 
-| secret | value |
-| --- | --- |
-| `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` | the CF account that holds the `teddessert.com` zone |
-| `NEXTAUTH_SECRET` | random 32+ chars |
-| `CALENDSO_ENCRYPTION_KEY` | random 32 chars |
-| `OWNER_PASSWORD` | the dashboard password |
-| `OWNER_EMAIL` / `OWNER_NAME` / `OWNER_USERNAME` | e.g. `you@…` / `Ted Dessert` / `ted` |
+The app is no longer on Cloudflare Containers (keeping a 6 GiB container warm
+ran ~$30–50/mo). It is a plain Docker image built in CI and run on a LattePanda
+3 Delta at home, published through a Cloudflare Tunnel.
 
-The worker forwards those secrets into the container (`app/src/index.ts`).
-Route: `book.teddessert.com/*` (`app/wrangler.toml`). Docker is required at
-deploy time (GitHub's ubuntu runner has it).
+```
+push to main (app/**) ──► GitHub Actions build ──► ghcr.io/modestapproach/teddessert-booking:latest
+                                                              │
+                                    LattePanda: docker compose pull && up -d
+                                                              │
+Internet ──► Cloudflare edge ──► cloudflared ──► 127.0.0.1:3000 ──► container
+```
+
+- **Build** — `.github/workflows/build-image.yml`, on push to `main` touching
+  `app/**` and on `workflow_dispatch`. It pushes `:latest` and `:<sha>` to GHCR
+  using the built-in `GITHUB_TOKEN` (`packages: write`); **no repo secrets are
+  needed for the app build any more**. The Panda never builds — too little disk
+  and RAM. Both sides are amd64, so this is a single-arch build.
+- **Run** — everything the Panda needs is in [`deploy/`](deploy/):
+  `docker-compose.yml` (pull `:latest`, `restart: unless-stopped`, bind
+  `127.0.0.1:3000` only), `.env.example` (copy to `deploy/.env`, gitignored),
+  `cloudflared-config.yml`, and [`deploy/README.md`](deploy/README.md) — the
+  copy-pasteable first-boot runbook (Docker install, moving Docker's data-root
+  to an external SSD so the 64 GB eMMC survives, tunnel setup, systemd,
+  verification).
+- **Runtime env** lives in `deploy/.env` on the box, not in repo secrets:
+  `NEXTAUTH_SECRET`, `CALENDSO_ENCRYPTION_KEY`, `OWNER_PASSWORD`,
+  `OWNER_EMAIL` / `OWNER_NAME` / `OWNER_USERNAME`, the three `NEXT_PUBLIC_*`
+  URLs and `SKIP_DB_MIGRATIONS=1`. The `NEXT_PUBLIC_*` values are also baked at
+  build time by `app/Dockerfile`'s defaults — CI does not override them.
+- **Update** — `cd deploy && docker compose pull && docker compose up -d`.
+
+`CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` are no longer used by CI; the
+only Cloudflare thing left is the tunnel's DNS record on the `teddessert.com`
+zone, created once with `cloudflared tunnel route dns`.
 
 ## First run
 

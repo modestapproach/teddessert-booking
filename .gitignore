@@ -7,3 +7,4 @@ node_modules
 out
 dist
 packages/backend/convex/_generated
+deploy/.env
