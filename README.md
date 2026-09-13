@@ -105,6 +105,10 @@ push to main (app/**) ──► GitHub Actions: next build --webpack ──► o
     page-data collection. Consequence on Workers: that avatar route fails
     when called (sharp is native and cannot run there). It works in the
     container.
+  - No route may declare `export const runtime = "edge"`. The Cloudflare
+    adapter runs everything on the Node.js runtime and refuses to bundle edge
+    routes ("cannot use the edge runtime"). `app/api/social/og/image` had it;
+    `next/og` works on Node.
 - **Limits to keep in mind** — 64 MiB uncompressed Worker size, 128 MB memory
   per isolate. The deploy workflow prints the bundle size on every run.
 
