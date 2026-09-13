@@ -1,0 +1,66 @@
+# Cloudflare Containers deployment for the booking app (Cal.com fork on Convex).
+# `wrangler deploy` (run from this directory) builds the Docker image, pushes
+# it to CF's auto-provisioned registry, and deploys the Worker + Container.
+# Requires Docker at deploy time — ubuntu-latest in GitHub Actions has it.
+#
+# The Cloudflare account comes from CLOUDFLARE_ACCOUNT_ID (no account_id here),
+# and the route's zone (teddessert.com) must live in that same account.
+#
+# COST: the whole bill is idle memory. Cloudflare charges $0.0000025 per
+# GiB-second only while an instance is awake, and "charges stop after the
+# container instance goes to sleep". standard-1 (4 GiB) awake 24/7 is ~$28/mo;
+# the same instance awake ~2 h/day is ~$2/mo. The dial is `sleepAfter` in
+# src/index.ts, not this file. See the root README for the arithmetic.
+
+name = "teddessert-book"
+main = "src/index.ts"
+compatibility_date = "2026-05-12"
+compatibility_flags = ["nodejs_compat"]
+
+[[containers]]
+class_name = "BookingApp"
+image = "./Dockerfile"
+# A deploy rolls a fresh instance in alongside the old one, so this needs to be
+# >1 for zero-downtime deploys. A single-owner booking page never needs the
+# second instance for load, so it costs nothing in steady state.
+max_instances = 2
+# standard-1: 1/2 vCPU, 4 GiB, 8 GB disk. The Next server idles well under
+# 4 GiB; standard-2 (6 GiB, 1 vCPU) was over-provisioned and cost ~1.5x per
+# awake hour. Bump back to standard-2 if the container OOMs or cold starts
+# are too slow — half a vCPU roughly doubles boot time.
+instance_type = "standard-1"
+
+[[durable_objects.bindings]]
+class_name = "BookingApp"
+name = "BOOKING_APP"
+
+[[migrations]]
+new_sqlite_classes = ["BookingApp"]
+tag = "v1"
+
+# custom_domain (not a plain route): Cloudflare creates the DNS record and the
+# certificate itself. A `pattern` + `zone_name` route needs a DNS record for
+# book.teddessert.com to already exist, and deleting the old Worker took that
+# record with it — so a route would deploy "successfully" and still not
+# resolve. This is what the previous Worker actually had attached.
+[[routes]]
+pattern = "book.teddessert.com"
+custom_domain = true
+
+[vars]
+NODE_ENV = "production"
+NEXT_TELEMETRY_DISABLED = "1"
+NEXT_PUBLIC_WEBAPP_URL = "https://book.teddessert.com"
+NEXT_PUBLIC_CONVEX_URL = "https://effervescent-dinosaur-191.convex.cloud"
+NEXT_PUBLIC_CONVEX_SITE_URL = "https://effervescent-dinosaur-191.convex.site"
+SKIP_DB_MIGRATIONS = "1"
+# NEXT_PUBLIC_VERCEL_USE_BOTID_IN_BOOKER must NOT be set
+
+# Secrets — set once via CLI or synced by the GitHub Actions workflow from the
+# repository secrets of the same names:
+#   cd app && wrangler secret put NEXTAUTH_SECRET
+#   cd app && wrangler secret put CALENDSO_ENCRYPTION_KEY
+#   cd app && wrangler secret put OWNER_PASSWORD
+#   cd app && wrangler secret put OWNER_EMAIL
+#   cd app && wrangler secret put OWNER_NAME
+#   cd app && wrangler secret put OWNER_USERNAME

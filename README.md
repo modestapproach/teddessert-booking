@@ -8,8 +8,8 @@ domain.
 packages/scheduling-engine   pure availability / slot / ranking math (MIT, from cal.diy)
 packages/backend             Convex backend  → https://effervescent-dinosaur-191.convex.cloud
 app/                         Cal.com fork (real Cal.com UI, data layer on Convex) → book.teddessert.com
-deploy/                      what runs on the VPS (compose + cloudflared + runbook)
-.github/workflows            deploy-backend.yml (Convex)  ·  build-image.yml (Docker image → GHCR)
+deploy/                      fallback: run the same container on any Linux box (compose + cloudflared + runbook)
+.github/workflows            deploy-backend.yml (Convex)  ·  deploy-app.yml (Cloudflare Containers)  ·  build-image.yml (manual fallback image → GHCR)
 ```
 
 ## How it fits together
@@ -49,48 +49,89 @@ Env on the Convex deployment (already set): `GOOGLE_CLIENT_ID`,
 Optional: `EMAIL_API_KEY` + `EMAIL_FROM` (Brevo confirmations + .ics),
 `TWILIO_*` (SMS), `TURNSTILE_SECRET_KEY`, `STRIPE_BOOKING_WEBHOOK_SECRET`.
 
-### App (`app/`) — GHCR image, run on a small VPS
+### App (`app/`) — Cloudflare Containers
 
-The app is no longer on Cloudflare Containers (keeping a 6 GiB container warm
-ran ~$30–50/mo). It is a plain Docker image built in CI and run on a small
-amd64 VPS (~$4–8/mo), published through a Cloudflare Tunnel.
+The Next.js frontend runs as a Docker container on Cloudflare, fronted by a
+Worker that proxies to it (`app/src/index.ts`) and owns the route
+`book.teddessert.com/*`. The data layer stays on Convex; the container is
+stateless and disposable.
 
 ```
-push to main (app/**) ──► GitHub Actions build ──► ghcr.io/modestapproach/teddessert-booking:latest
-                                                              │
-                                    VPS: docker compose pull && up -d
-                                                              │
-Internet ──► Cloudflare edge ──► cloudflared ──► 127.0.0.1:3000 ──► container
+push to main (app/**) ──► GitHub Actions ──► wrangler deploy (builds the Dockerfile,
+                                              pushes to CF's managed registry)
+                                                          │
+Internet ──► Worker (book.teddessert.com) ──► Container :3000 ──► Convex
 ```
 
-- **Build** — `.github/workflows/build-image.yml`, on push to `main` touching
-  `app/**` and on `workflow_dispatch`. It pushes `:latest` and `:<sha>` to GHCR
-  using the built-in `GITHUB_TOKEN` (`packages: write`); **no repo secrets are
-  needed for the app build any more**. The VPS never builds — the cal.com
-  build wants ~6 GB of heap and far more disk than a $5 box has. Both sides
-  are amd64, so this is a single-arch build.
-- **Run** — everything the VPS needs is in [`deploy/`](deploy/):
-  `docker-compose.yml` (pull `:latest`, `restart: unless-stopped`, bind
-  `127.0.0.1:3000` only), `.env.example` (copy to `deploy/.env`, gitignored),
-  `cloudflared-config.yml`, and [`deploy/README.md`](deploy/README.md) — the
-  copy-pasteable first-boot runbook (provisioning + firewall, Docker install,
-  tunnel setup, systemd, verification, updates).
-- **Runtime env** lives in `deploy/.env` on the box, not in repo secrets:
-  `NEXTAUTH_SECRET`, `CALENDSO_ENCRYPTION_KEY`, `OWNER_PASSWORD`,
-  `OWNER_EMAIL` / `OWNER_NAME` / `OWNER_USERNAME`, the three `NEXT_PUBLIC_*`
-  URLs and `SKIP_DB_MIGRATIONS=1`. The `NEXT_PUBLIC_*` values are also baked at
-  build time by `app/Dockerfile`'s defaults — CI does not override them.
-- **Update** — `cd deploy && docker compose pull && docker compose up -d`.
+- **Deploy** — `.github/workflows/deploy-app.yml`, on push to `main` touching
+  `app/**` and on `workflow_dispatch`. It checks the eight repo secrets exist,
+  frees runner disk (the cal build overruns the default ~14 GB), then
+  `wrangler deploy` builds `app/Dockerfile` and syncs the runtime secrets into
+  the Worker. Config is `app/wrangler.toml`.
+- **Repo secrets it needs** (all eight, or the deploy stops at the preflight):
 
-`CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` are no longer used by CI; the
-only Cloudflare thing left is the tunnel's DNS record on the `teddessert.com`
-zone, created once with `cloudflared tunnel route dns`. Tunnel is free, so the
-Cloudflare cost of this setup is $0.
+  | secret | value |
+  | --- | --- |
+  | `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` | the account holding the `teddessert.com` zone |
+  | `NEXTAUTH_SECRET` | random 32+ chars — `openssl rand -hex 32` |
+  | `CALENDSO_ENCRYPTION_KEY` | random 32 chars — `openssl rand -hex 16` |
+  | `OWNER_PASSWORD` | the dashboard password |
+  | `OWNER_EMAIL` / `OWNER_NAME` / `OWNER_USERNAME` | e.g. `you@…` / `Ted Dessert` / `ted` |
 
-**Why a VPS and not the LattePanda at home:** the Panda hosts things whose
-downtime hurts only the owner (Twenty, personal tooling). A public booking page
-fails *silently* when a home link or the power blips — nobody reports the
-booking they didn't make. A datacenter box for ~$5/mo is the right trade.
+  Fresh values are fine for the last six — nothing durable is encrypted with
+  them. Bookings, availability and Google tokens live in Convex.
+
+#### What it costs, and the one knob that decides
+
+Cloudflare bills a container **only while it is awake**: $0.0000025 per
+GiB-second of memory, plus a negligible amount for disk, and CPU on actual use.
+Requests and bandwidth are rounding errors for a personal booking page. So the
+bill is almost exactly *awake hours × instance memory*:
+
+| instance | awake 24/7 | awake ~3 h/day | awake ~1 h/day |
+| --- | --- | --- | --- |
+| `standard-1` (4 GiB) — current | ~$28/mo | ~$3.4/mo | ~$1.1/mo |
+| `standard-2` (6 GiB) — the old setting | ~$41/mo | ~$5.0/mo | ~$1.7/mo |
+
+The knob is **`sleepAfter` in `app/src/index.ts`**, not the instance type. It was `"2h"`, which meant one morning visit kept 6 GiB warm
+until lunchtime and any trickle of traffic never let it sleep — that is how
+this reached ~$40/mo. It is now **`"15m"`**: long enough for a booking session
+(browse slots → confirm), short enough that a quiet day costs cents.
+
+**The trade-off is real**: the first visitor after a quiet spell waits ~10–20 s
+while the container and Next boot. If a lost booking matters more than ~$25/mo,
+raise `sleepAfter` (or go to a small always-on VPS — see the fallback below).
+
+#### Build details that are load-bearing
+
+- `outputFileTracingRoot` is a **top-level** `next.config.ts` key. Under
+  `experimental` (where upstream cal.com has it) Next 16 silently ignores it,
+  the trace root falls back to `apps/web`, and the standalone server ships
+  without hoisted workspace dependencies.
+- `yarn copy-app-store-static` runs before `next build` in the Dockerfile.
+  Turbo's `build` task depends on it; a bare `next build` does not, and
+  `app/api/social/og/image` imports the `svg-hashes.json` it generates.
+
+#### Rejected: Cloudflare Workers (OpenNext)
+
+Running the app *inside* a Worker via `@opennextjs/cloudflare` does not work
+for this codebase and is not worth retrying. It builds only after seven
+separate fixes (`--webpack` instead of Turbopack, `node:`-scheme stripping, a
+sharp stub, dropping `runtime = "edge"`, `useWorkerdCondition: false`, a
+`superagent-proxy` stub, the tracing-root fix above) — and the result is a
+**167.7 MiB** `worker.js` against Cloudflare's **64 MiB** limit, 2.6× over and
+already minified, plus a 37 MiB app-store asset over the 25 MiB per-file cap.
+The upstream dibslist repo carries an OpenNext config too; it has never been
+deployed and cannot build as committed.
+
+#### Fallback: the same image anywhere
+
+`.github/workflows/build-image.yml` (manual, `workflow_dispatch`) builds the
+identical Dockerfile and pushes `ghcr.io/modestapproach/teddessert-booking`.
+[`deploy/`](deploy/) has a compose file, cloudflared config and runbook to run
+it on any amd64 Linux box behind a free Cloudflare Tunnel — ~$4–8/mo on a small
+VPS, always warm, no cold starts. Use it if the sleep latency proves annoying,
+or to pin and roll back to a specific `:<sha>`.
 
 ## First run
 

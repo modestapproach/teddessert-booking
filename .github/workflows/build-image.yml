@@ -1,19 +1,15 @@
 name: Build booking image (GHCR)
 
-# Builds the Cal.com-fork Docker image on GitHub's runner and pushes it to
-# GHCR. The VPS that runs the app only ever pulls — it has neither the
-# disk nor the RAM to build this image. Both are amd64, so this is a plain
-# single-arch build.
+# FALLBACK PATH — manual only. The primary deployment is deploy-app.yml
+# (Cloudflare Containers), which builds this same Dockerfile itself; running
+# both on every push would build the image twice for nothing.
 #
-# Consumed by deploy/docker-compose.yml:
+# Run this by hand when you want the image runnable somewhere other than
+# Cloudflare — any Linux box via deploy/docker-compose.yml, or to keep a
+# known-good `:<sha>` tag to roll back to:
 #   ghcr.io/modestapproach/teddessert-booking:latest
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - "app/**"
-      - ".github/workflows/build-image.yml"
   workflow_dispatch:
 
 permissions:

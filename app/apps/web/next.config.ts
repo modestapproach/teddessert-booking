@@ -241,10 +241,13 @@ const nextConfig = (phase: string): NextConfig => {
       "@prisma/client",
       ".prisma/client",
     ],
+    // Required for standalone output to include packages/* from the workspace
+    // root. Top-level since Next 15 — under `experimental` (where upstream has
+    // it) Next 16 silently ignores it, the trace root falls back to apps/web,
+    // and the standalone server is missing hoisted workspace dependencies.
+    outputFileTracingRoot: path.join(__dirname, "../../"),
     experimental: {
       optimizePackageImports: ["@calcom/ui"],
-      // Required for standalone output to include packages/* from workspace root
-      outputFileTracingRoot: path.join(__dirname, "../../"),
     },
     productionBrowserSourceMaps: true,
     transpilePackages: [
