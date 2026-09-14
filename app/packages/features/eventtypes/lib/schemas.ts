@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { isReservedSlug } from "@calcom/lib/ownerRouting";
 import { eventTypeLocations, eventTypeSlug } from "@calcom/lib/zod/eventType";
 import { SchedulingType } from "@calcom/prisma/enums";
 import { EventTypeMetaDataSchema } from "@calcom/prisma/zod-utils";
@@ -57,7 +58,7 @@ export type TEventTypeDuplicateInput = {
 export const EventTypeDuplicateInput: z.ZodType<TEventTypeDuplicateInput> = z
   .object({
     id: z.number(),
-    slug: z.string(),
+    slug: z.string().refine((val) => !isReservedSlug(val), { message: "This URL is used by the booking app itself; choose another slug." }),
     title: z.string().min(1),
     description: z.string(),
     length: z.number(),

@@ -1,4 +1,5 @@
 import { useIsPlatform } from "@calcom/atoms/hooks/useIsPlatform";
+import { publicEventPrefix } from "@calcom/lib/ownerRouting";
 import type { LocationCustomClassNames } from "@calcom/features/eventtypes/components/locations/types";
 import type {
   EventTypeSetupProps,
@@ -179,13 +180,12 @@ export const EventSetupTab = (
             addOnLeading={
               isPlatform ? undefined : (
                 <span className="flex items-center h-full min-w-0 max-w-24 overflow-hidden text-ellipsis whitespace-nowrap md:max-w-56 text-sm leading-[1.5] relative top-[1px]">
-                  {urlPrefix}/
+                  {urlPrefix}
                   {!isManagedEventType
                     ? team
-                      ? (hasOrgBranding ? "" : "team/") + team.slug
-                      : formMethods.getValues("users")[0].username
-                    : t("username_placeholder")}
-                  /
+                      ? `/${(hasOrgBranding ? "" : "team/") + team.slug}/`
+                      : publicEventPrefix(formMethods.getValues("users")?.[0]?.username)
+                    : `/${t("username_placeholder")}/`}
                 </span>
               )
             }

@@ -4,6 +4,7 @@ import { Dialog } from "@calcom/features/components/controlled-dialog";
 import { APP_NAME } from "@calcom/lib/constants";
 import { extractHostTimezone, filterActiveLinks } from "@calcom/lib/hashedLinksUtils";
 import { useCopy } from "@calcom/lib/hooks/useCopy";
+import { publicEventPath } from "@calcom/lib/ownerRouting";
 import { useInViewObserver } from "@calcom/lib/hooks/useInViewObserver";
 import { useLocale } from "@calcom/lib/hooks/useLocale";
 import { useGetTheme } from "@calcom/lib/hooks/useTheme";
@@ -198,7 +199,7 @@ const Item = ({
         <small
           className="hidden font-normal text-subtle leading-4 sm:inline"
           data-testid={`event-type-slug-${type.id}`}>
-          {`/${group.profile.slug}/${type.slug}`}
+          {publicEventPath(group.profile.slug, type.slug)}
         </small>
       ) : null}
       {!isManagedEventType && type.hidden && (
@@ -242,7 +243,7 @@ const Item = ({
                 <small
                   className="hidden font-normal text-subtle leading-4 sm:inline"
                   data-testid={`event-type-slug-${type.id}`}>
-                  {`/${group.profile.slug}/${type.slug}`}
+                  {publicEventPath(group.profile.slug, type.slug)}
                 </small>
               ) : null}
               {!isManagedEventType && type.hidden && (
@@ -539,7 +540,8 @@ export const InfiniteEventTypeList = ({
         {pages.map((page, pageIdx) => {
           return page?.eventTypes?.map((type, index) => {
             const embedLink = `${group.profile.slug}/${type.slug}`;
-            const calLink = `${bookerUrl}/${embedLink}`;
+            // What preview/copy/share hand out; the embed keeps `<username>/<slug>` (calLink form).
+            const calLink = `${bookerUrl}${publicEventPath(group.profile.slug, type.slug)}`;
 
             const activeHashedLinks = type.hashedLink ? filterActiveLinks(type.hashedLink, userTimezone) : [];
 

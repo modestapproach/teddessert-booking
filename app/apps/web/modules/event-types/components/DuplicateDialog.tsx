@@ -1,4 +1,5 @@
 import { zodResolver } from "@hookform/resolvers/zod";
+import { publicEventPrefix } from "@calcom/lib/ownerRouting";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
@@ -142,7 +143,7 @@ const DuplicateDialog = () => {
               <TextField
                 label={`${t("url")}: ${process.env.NEXT_PUBLIC_WEBSITE_URL}`}
                 required
-                addOnLeading={<>/{pageSlug}/</>}
+                addOnLeading={<>{publicEventPrefix(pageSlug)}</>}
                 {...register("slug")}
                 onChange={(e) => {
                   form.setValue("slug", slugify(e?.target.value), { shouldTouch: true });
@@ -154,7 +155,8 @@ const DuplicateDialog = () => {
                 required
                 addOnLeading={
                   <>
-                    {process.env.NEXT_PUBLIC_WEBSITE_URL}/{pageSlug}/
+                    {process.env.NEXT_PUBLIC_WEBSITE_URL}
+                    {publicEventPrefix(pageSlug)}
                   </>
                 }
                 {...register("slug")}

@@ -1,4 +1,5 @@
 import type {
+import { isReservedSlug } from "@calcom/lib/ownerRouting";
   CalVideoSettings,
   ChildInput,
   DestinationCalendarInput,
@@ -109,7 +110,10 @@ const BaseEventTypeUpdateInput: z.ZodType<TUpdateInputSchema> = z
     periodType: z.enum(["UNLIMITED", "ROLLING", "ROLLING_WINDOW", "RANGE"]).optional(),
     schedulingType: z.enum(["ROUND_ROBIN", "COLLECTIVE", "MANAGED"]).nullable().optional(),
     title: z.string().min(1).optional(),
-    slug: z.string().optional(),
+    slug: z
+      .string()
+      .refine((val) => !isReservedSlug(val), { message: "This URL is used by the booking app itself; choose another slug." })
+      .optional(),
     description: z.string().nullable().optional(),
     interfaceLanguage: z.string().nullable().optional(),
     position: z.number().int().optional(),

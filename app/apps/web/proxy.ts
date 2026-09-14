@@ -1,4 +1,5 @@
 import { getCspHeader, getCspNonce } from "@lib/csp";
+import { resolveOwnerRoute } from "@calcom/lib/ownerRouting";
 import { get } from "@vercel/edge-config";
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
@@ -90,11 +91,24 @@ const proxy = async (req: NextRequest): Promise<NextResponse<unknown>> => {
     }
   }
 
-  const res = NextResponse.next({
-    request: {
-      headers: sanitizeRequestHeaders(requestHeaders),
-    },
-  });
+  // Single-owner clean URLs: `/` and `/<event-slug>` are the owner's public
+  // booking pages, `/<username>/…` canonicalizes to the clean form, and the
+  // dashboard lives under /dash. See @calcom/lib/ownerRouting.
+  const owner = resolveOwnerRoute(url.pathname, process.env.OWNER_USERNAME);
+  if (owner.kind === "redirect") {
+    const target = url.clone();
+    target.pathname = owner.pathname;
+    return NextResponse.redirect(target, 307);
+  }
+  const requestInit = { request: { headers: sanitizeRequestHeaders(requestHeaders) } };
+  let res: NextResponse;
+  if (owner.kind === "rewrite") {
+    const target = url.clone();
+    target.pathname = owner.pathname;
+    res = NextResponse.rewrite(target, requestInit);
+  } else {
+    res = NextResponse.next(requestInit);
+  }
 
   if (url.pathname.startsWith("/auth/logout")) {
     res.cookies.delete("next-auth.session-token");
@@ -162,7 +176,21 @@ function enrichRequestWithHeaders({ req }: { req: NextRequest }) {
 }
 
 export const config = {
-  matcher: ["/auth/login", "/login", "/apps/installed", "/auth/logout", "/:path*/embed", "/availability", "/api/auth/signup"],
+  // The first entry covers every page path so `/` and `/<slug>` reach
+  // resolveOwnerRoute. Next reads this config statically at build time, so it
+  // must be a literal: keep it identical to OWNER_ROUTING_MATCHER in
+  // @calcom/lib/ownerRouting (proxy.test.ts asserts they match). The explicit
+  // entries stay for the API path the pattern excludes.
+  matcher: [
+    "/((?!api/|_next/|_trpc/|_proxy/|.*\\..*).*)",
+    "/auth/login",
+    "/login",
+    "/apps/installed",
+    "/auth/logout",
+    "/:path*/embed",
+    "/availability",
+    "/api/auth/signup",
+  ],
 };
 
 export default proxy;

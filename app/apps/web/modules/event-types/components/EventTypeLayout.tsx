@@ -1,4 +1,5 @@
 import type { EventTypeSetupProps, FormValues } from "@calcom/features/eventtypes/lib/types";
+import { publicEventPath } from "@calcom/lib/ownerRouting";
 import { useLocale } from "@calcom/lib/hooks/useLocale";
 import { SchedulingType } from "@calcom/prisma/enums";
 import classNames from "@calcom/ui/classNames";
@@ -86,11 +87,9 @@ function EventTypeSingleLayout({
   // event (the synthesized event type carries the owner via getEventTypeById, but
   // never assume a populated array here) — optional-chain so the editor never
   // 500s on `users[0].username`.
-  const permalink = `${bookerUrl}/${
-    team
-      ? `${!team.parentId ? "team/" : ""}${team.slug}`
-      : formMethods.getValues("users")?.[0]?.username ?? ""
-  }/${eventType.slug}`;
+  const permalink = team
+    ? `${bookerUrl}/${!team.parentId ? "team/" : ""}${team.slug}/${eventType.slug}`
+    : `${bookerUrl}${publicEventPath(formMethods.getValues("users")?.[0]?.username, eventType.slug)}`;
 
   const embedLink = `${
     team ? `team/${team.slug}` : formMethods.getValues("users")?.[0]?.username ?? ""

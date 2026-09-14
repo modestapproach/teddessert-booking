@@ -1,6 +1,7 @@
 "use client";
 
 import { useEventTypeForm } from "@calcom/atoms/event-types/hooks/useEventTypeForm";
+import { publicEventPath } from "@calcom/lib/ownerRouting";
 import { useHandleRouteChange } from "@calcom/atoms/event-types/hooks/useHandleRouteChange";
 import { useTabsNavigations } from "@calcom/atoms/event-types/hooks/useTabsNavigations";
 import type { ChildrenEventType } from "@calcom/features/eventtypes/components/ChildrenEventTypeSelect";
@@ -187,11 +188,9 @@ const EventTypeWeb = ({
   // no-Postgres fork: the synthesized event type returns `users: []` (CV-9 — the editor re-derives the
   // owner profile client-side), so `eventType.users[0]` is undefined → `.username` crashed the editor.
   // Fall back to the logged-in owner's username (`useMeQuery`), which is the correct permalink owner.
-  const permalink = `${bookerUrl}/${
-    team ? `team/${team.slug}` : eventType.users[0]?.username ?? user?.username ?? ""
-  }/${
-    eventType.slug
-  }`;
+  const permalink = team
+    ? `${bookerUrl}/team/${team.slug}/${eventType.slug}`
+    : `${bookerUrl}${publicEventPath(eventType.users[0]?.username ?? user?.username, eventType.slug)}`;
 
   const tabMap = {
     setup: (

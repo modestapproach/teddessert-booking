@@ -10,7 +10,7 @@ export default async function OwnerLoginPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const sp = await searchParams;
-  const next = typeof sp.next === "string" ? sp.next : "/";
+  const next = typeof sp.next === "string" ? sp.next : "/dash";
   const error = sp.error !== undefined;
 
   return (

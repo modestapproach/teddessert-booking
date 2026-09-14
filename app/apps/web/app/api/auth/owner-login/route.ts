@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
 const ORIGIN = (process.env.NEXT_PUBLIC_WEBAPP_URL || "http://localhost:3000").replace(/\/$/, "");
 
 function safeNext(raw: string | null): string {
-  if (!raw || !raw.startsWith("/") || raw.startsWith("//")) return "/";
+  if (!raw || !raw.startsWith("/") || raw.startsWith("//")) return "/dash";
   return raw;
 }
 

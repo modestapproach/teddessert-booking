@@ -6,6 +6,7 @@ import { UserRepository } from "@calcom/features/users/repositories/UserReposito
 import { DEFAULT_DARK_BRAND_COLOR, DEFAULT_LIGHT_BRAND_COLOR } from "@calcom/lib/constants";
 import { getUserAvatarUrl } from "@calcom/lib/getAvatarUrl";
 import logger from "@calcom/lib/logger";
+import { publicEventPath } from "@calcom/lib/ownerRouting";
 import { markdownToSafeHTML } from "@calcom/lib/markdownToSafeHTML";
 import { safeStringify } from "@calcom/lib/safeStringify";
 import { stripMarkdown } from "@calcom/lib/stripMarkdown";
@@ -167,7 +168,7 @@ export const getServerSideProps: GetServerSideProps<UserPageProps> = async (cont
   // if profile only has one public event-type, redirect to it
   if (eventTypes.length === 1 && context.query.redirect !== "false") {
     // Redirect but don't change the URL
-    const urlDestination = `/${user.profile.username}/${eventTypes[0].slug}`;
+    const urlDestination = publicEventPath(user.profile.username, eventTypes[0].slug);
     const { query } = context;
     const urlQuery = new URLSearchParams(encode(query));
 
@@ -227,7 +228,9 @@ function buildPublicForkUser(username: string): ForkPublicUser {
   return {
     id: 0,
     username,
-    name: username,
+    // The single owner's display name (forwarded into the container alongside
+    // OWNER_USERNAME); anything else stays username-as-name.
+    name: (username.toLowerCase() === process.env.OWNER_USERNAME?.trim().toLowerCase() && process.env.OWNER_NAME?.trim()) || username,
     bio: null,
     avatarUrl: null,
     verified: false,

@@ -1,0 +1,119 @@
+import { readFileSync, readdirSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+import { describe, expect, it } from "vitest";
+
+import { OWNER_ROUTING_MATCHER, RESERVED_SEGMENTS, isReservedSlug, publicEventPath, publicEventPrefix, resolveOwnerRoute } from "./ownerRouting";
+
+const here = dirname(fileURLToPath(import.meta.url));
+const web = join(here, "..", "..", "apps", "web");
+
+describe("resolveOwnerRoute", () => {
+  const cases: [path: string, expected: ReturnType<typeof resolveOwnerRoute>][] = [
+    ["/", { kind: "rewrite", pathname: "/ted" }],
+    ["/30", { kind: "rewrite", pathname: "/ted/30" }],
+    ["/meet-with-ted", { kind: "rewrite", pathname: "/ted/meet-with-ted" }],
+    ["/30/embed", { kind: "rewrite", pathname: "/ted/30/embed" }],
+    ["/30/", { kind: "rewrite", pathname: "/ted/30" }],
+    // old-style links canonicalize
+    ["/ted", { kind: "redirect", pathname: "/" }],
+    ["/ted/", { kind: "redirect", pathname: "/" }],
+    ["/ted/30", { kind: "redirect", pathname: "/30" }],
+    ["/Ted/30", { kind: "redirect", pathname: "/30" }],
+    ["/ted/30/embed", { kind: "redirect", pathname: "/30/embed" }],
+    // the owner's avatar is a next.config rewrite, not a booking page
+    ["/ted/avatar.png", { kind: "next" }],
+    // the app's own surface passes through
+    ["/dash", { kind: "next" }],
+    ["/owner-login", { kind: "next" }],
+    ["/event-types", { kind: "next" }],
+    ["/bookings/upcoming", { kind: "next" }],
+    ["/getting-started", { kind: "next" }],
+    ["/settings/my-account/profile", { kind: "next" }],
+    ["/booking/abc123", { kind: "next" }],
+    ["/reschedule/abc123", { kind: "next" }],
+    ["/api/health", { kind: "next" }],
+    ["/_next/static/chunk.js", { kind: "next" }],
+    ["/favicon.ico", { kind: "next" }],
+    ["/robots.txt", { kind: "next" }],
+    // not a slug shape → not ours
+    ["/Meet", { kind: "next" }],
+    ["/some_thing", { kind: "next" }],
+  ];
+  it.each(cases)("%s", (path, expected) => {
+    expect(resolveOwnerRoute(path, "ted")).toEqual(expected);
+  });
+
+  it("does nothing without an owner username", () => {
+    expect(resolveOwnerRoute("/", undefined)).toEqual({ kind: "next" });
+    expect(resolveOwnerRoute("/30", "")).toEqual({ kind: "next" });
+  });
+
+  it("preserves the configured username casing in rewrite targets", () => {
+    expect(resolveOwnerRoute("/30", "Ted")).toEqual({ kind: "rewrite", pathname: "/Ted/30" });
+  });
+});
+
+describe("RESERVED_SEGMENTS matches the route tree", () => {
+  // Every non-dynamic top-level segment under app/ and pages/ must be
+  // reserved, otherwise a request for it would be rewritten into a booking
+  // page. Dynamic segments ([user]) are the booking pages themselves.
+  const topLevelSegments = (dir: string): string[] => {
+    const out: string[] = [];
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const name = entry.name;
+      if (name.startsWith("[") || name.startsWith("_") || name.startsWith(".")) continue;
+      if (entry.isDirectory()) {
+        if (name.startsWith("(") && name.endsWith(")")) out.push(...topLevelSegments(join(dir, name)));
+        else out.push(name);
+      }
+    }
+    return out;
+  };
+
+  it("covers apps/web/app", () => {
+    const missing = topLevelSegments(join(web, "app")).filter((s) => !RESERVED_SEGMENTS.has(s));
+    expect(missing).toEqual([]);
+  });
+
+  it("covers apps/web/pages", () => {
+    const missing = topLevelSegments(join(web, "pages")).filter((s) => !RESERVED_SEGMENTS.has(s));
+    expect(missing).toEqual([]);
+  });
+});
+
+describe("public URL helpers", () => {
+  it("drop the username on the single-owner fork and keep it on stock cal", () => {
+    expect(publicEventPath("ted", "30", true)).toBe("/30");
+    expect(publicEventPath("ted", "30", false)).toBe("/ted/30");
+    expect(publicEventPrefix("ted", true)).toBe("/");
+    expect(publicEventPrefix("ted", false)).toBe("/ted/");
+    expect(publicEventPath(undefined, "30", false)).toBe("//30");
+  });
+
+  it("refuse slugs the app already routes", () => {
+    for (const s of ["dash", "settings", "api", "Event-Types", "_next", "sw.js"]) expect(isReservedSlug(s)).toBe(true);
+    for (const s of ["30", "15", "meet-with-ted", "secret"]) expect(isReservedSlug(s)).toBe(false);
+  });
+
+  it("agree with the backend's copy of the reserved list (used by the admin MCP)", () => {
+    const backend = readFileSync(join(here, "..", "..", "..", "packages", "backend", "convex", "reservedSlugs.ts"), "utf8");
+    const listed = new Set([...backend.matchAll(/"([a-z0-9-]+)"/g)].map((m) => m[1]));
+    expect([...listed].sort()).toEqual([...RESERVED_SEGMENTS].sort());
+  });
+});
+
+describe("OWNER_ROUTING_MATCHER", () => {
+  // Next compiles the matcher with path-to-regexp; the custom group is a plain
+  // regex, so an equivalent RegExp is enough to check what it selects.
+  const re = new RegExp(`^${OWNER_ROUTING_MATCHER.replace(/^\//, "\\/")}$`);
+  it.each(["/", "/30", "/ted", "/ted/30", "/30/embed", "/dash", "/owner-login"])("matches %s", (p) => {
+    expect(re.test(p)).toBe(true);
+  });
+  it.each(["/api/health", "/_next/static/x.js", "/_trpc/viewer", "/favicon.ico", "/ted/avatar.png"])(
+    "skips %s",
+    (p) => {
+      expect(re.test(p)).toBe(false);
+    }
+  );
+});
