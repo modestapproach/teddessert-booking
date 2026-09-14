@@ -1,6 +1,7 @@
 "use client";
 
 import {
+import { publicEventPath } from "@calcom/lib/ownerRouting";
   sdkActionManager,
   useEmbedNonStylesConfig,
   useEmbedStyles,
@@ -121,7 +122,7 @@ export function UserPage(props: PageProps) {
                 style={{ display: "flex", ...eventTypeListItemEmbedStyles }}
                 prefetch={false}
                 href={{
-                  pathname: `/${user.profile.username}/${type.slug}`,
+                  pathname: publicEventPath(user.profile.username, type.slug),
                   query,
                 }}
                 passHref

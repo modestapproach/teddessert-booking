@@ -29,6 +29,7 @@
 //     `Mcp-Session-Id` ignored (we never mint one). Responses are always a
 //     single JSON object — no SSE, no server-initiated messages.
 import { ConvexError } from "convex/values";
+import { isReservedSlug } from "./reservedSlugs";
 import { httpAction } from "./_generated/server";
 import { api, internal } from "./_generated/api";
 import { corsHeaders } from "./extensionAuth";
@@ -89,8 +90,15 @@ const WINDOW = {
   },
   required: ["days", "startMinute", "endMinute"],
 };
+// A slug that collides with a path the booking app owns would create an event
+// nobody can reach at book.teddessert.com/<slug>; refuse it up front.
+function assertSlugAllowed(slug: unknown): void {
+  if (typeof slug !== "string") return;
+  if (isReservedSlug(slug)) throw new Error(`"${slug}" is a path the booking app already uses; choose another slug.`);
+}
+
 const EVENT_TYPE_FIELDS = {
-  slug: str("URL slug, e.g. `intro` → book.teddessert.com/ted/intro. Lowercase, hyphens."),
+  slug: str("URL slug, e.g. `intro` → book.teddessert.com/intro. Lowercase, hyphens. Paths the app itself uses (dash, settings, api, …) are refused."),
   title: str("Display title."),
   description: str("Description shown to bookers (markdown ok)."),
   durationMinutes: int("Meeting length in minutes."),
@@ -168,6 +176,7 @@ export const ADMIN_MCP_TOOLS: AdminTool[] = [
     inputSchema: { type: "object", properties: EVENT_TYPE_FIELDS, required: ["slug", "title", "durationMinutes"] },
     scope: "admin:write",
     call: async (ctx, args, owner) => {
+      assertSlugAllowed(args.slug);
       const input = {
         ownerAuthUserId: owner,
         schedulingType: "collective",
@@ -199,6 +208,7 @@ export const ADMIN_MCP_TOOLS: AdminTool[] = [
     },
     scope: "admin:write",
     call: async (ctx, args, owner) => {
+      if (args.slug !== undefined) assertSlugAllowed(args.slug);
       const keys = ["id", "calEventTypeId", ...Object.keys(EVENT_TYPE_FIELDS), "seatsPerSlot", "interactionMode", "lotteryCloseLeadMinutes", "thresholdMinAttendees"];
       await ctx.runMutation(calAdmin.adminUpdateEventType, { ownerAuthUserId: owner, ...pick(args, keys) });
       return getEventType(ctx, owner, args);
@@ -224,6 +234,7 @@ export const ADMIN_MCP_TOOLS: AdminTool[] = [
     },
     scope: "admin:write",
     call: async (ctx, args, owner) => {
+      assertSlugAllowed(args.slug);
       await ctx.runMutation(calAdmin.adminDuplicateEventType, { ownerAuthUserId: owner, ...pick(args, ["id", "calEventTypeId", "slug", "title", "description", "durationMinutes"]) });
       return ctx.runQuery(calAdmin.adminGetEventTypeBySlug, { ownerAuthUserId: owner, slug: args.slug });
     },

@@ -8,7 +8,7 @@ import { buildLegacyRequest } from "@lib/buildLegacyCtx";
 
 // /dash: the owner's dashboard entry. Unauthenticated visitors go to the owner
 // sign-in. The public booking pages live at / and /<event-slug> (see
-// lib/ownerRouting.ts) and never touch this route.
+// @calcom/lib/ownerRouting) and never touch this route.
 const DashPage = async () => {
   const session = await getServerSession({ req: buildLegacyRequest(await headers(), await cookies()) });
 

@@ -1,11 +1,12 @@
-import { readdirSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
-import { OWNER_ROUTING_MATCHER, RESERVED_SEGMENTS, resolveOwnerRoute } from "./ownerRouting";
+import { OWNER_ROUTING_MATCHER, RESERVED_SEGMENTS, isReservedSlug, publicEventPath, publicEventPrefix, resolveOwnerRoute } from "./ownerRouting";
 
 const here = dirname(fileURLToPath(import.meta.url));
+const web = join(here, "..", "..", "apps", "web");
 
 describe("resolveOwnerRoute", () => {
   const cases: [path: string, expected: ReturnType<typeof resolveOwnerRoute>][] = [
@@ -71,13 +72,34 @@ describe("RESERVED_SEGMENTS matches the route tree", () => {
   };
 
   it("covers apps/web/app", () => {
-    const missing = topLevelSegments(join(here, "..", "app")).filter((s) => !RESERVED_SEGMENTS.has(s));
+    const missing = topLevelSegments(join(web, "app")).filter((s) => !RESERVED_SEGMENTS.has(s));
     expect(missing).toEqual([]);
   });
 
   it("covers apps/web/pages", () => {
-    const missing = topLevelSegments(join(here, "..", "pages")).filter((s) => !RESERVED_SEGMENTS.has(s));
+    const missing = topLevelSegments(join(web, "pages")).filter((s) => !RESERVED_SEGMENTS.has(s));
     expect(missing).toEqual([]);
+  });
+});
+
+describe("public URL helpers", () => {
+  it("drop the username on the single-owner fork and keep it on stock cal", () => {
+    expect(publicEventPath("ted", "30", true)).toBe("/30");
+    expect(publicEventPath("ted", "30", false)).toBe("/ted/30");
+    expect(publicEventPrefix("ted", true)).toBe("/");
+    expect(publicEventPrefix("ted", false)).toBe("/ted/");
+    expect(publicEventPath(undefined, "30", false)).toBe("//30");
+  });
+
+  it("refuse slugs the app already routes", () => {
+    for (const s of ["dash", "settings", "api", "Event-Types", "_next", "sw.js"]) expect(isReservedSlug(s)).toBe(true);
+    for (const s of ["30", "15", "meet-with-ted", "secret"]) expect(isReservedSlug(s)).toBe(false);
+  });
+
+  it("agree with the backend's copy of the reserved list (used by the admin MCP)", () => {
+    const backend = readFileSync(join(here, "..", "..", "..", "packages", "backend", "convex", "reservedSlugs.ts"), "utf8");
+    const listed = new Set([...backend.matchAll(/"([a-z0-9-]+)"/g)].map((m) => m[1]));
+    expect([...listed].sort()).toEqual([...RESERVED_SEGMENTS].sort());
   });
 });
 

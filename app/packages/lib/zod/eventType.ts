@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { isReservedSlug } from "../ownerRouting";
 import slugify from "../slugify";
 
 /**
@@ -46,4 +47,9 @@ export const eventTypeSlug = z
   .transform((val) => slugify(val))
   .refine((val) => val.length >= 1, {
     message: "Please enter at least one character",
+  })
+  // A slug the booking app already routes (dash, settings, api, …) would be
+  // an event nobody can reach at /<slug>; see ownerRouting.ts.
+  .refine((val) => !isReservedSlug(val), {
+    message: "This URL is used by the booking app itself; choose another slug.",
   });

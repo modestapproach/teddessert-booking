@@ -18,6 +18,12 @@
  * route fails the test instead of silently being rewritten into a booking
  * page. Locale-prefixed paths (/en/…) were never public URLs here and are
  * not supported as clean slugs.
+ *
+ * The same module owns the other half of the contract: every place the app
+ * PRINTS or COPIES a public event URL (dashboard list, editor permalink,
+ * create/duplicate dialogs, profile page, booking emails) builds it with
+ * publicEventPath/publicEventPrefix so the link people see is the link that
+ * works, and isReservedSlug keeps a new event from taking a path the app owns.
  */
 export type OwnerRoute =
   | { kind: "next" }
@@ -83,6 +89,26 @@ export const OWNER_ROUTING_MATCHER = "/((?!api/|_next/|_trpc/|_proxy/|.*\\..*).*
 // Cal.com enforces lowercase kebab-case on event slugs.
 const SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const isFile = (segment: string) => segment.includes(".");
+
+// Same signal the rest of the fork keys off (IS_CONVEX_FORK): one bookable
+// person, so public event URLs drop the username segment.
+export const IS_SINGLE_OWNER = !!process.env.NEXT_PUBLIC_CONVEX_URL;
+
+/** `/<slug>` on the single-owner fork, `/<username>/<slug>` on stock cal. */
+export function publicEventPath(username: string | null | undefined, slug: string, singleOwner = IS_SINGLE_OWNER): string {
+  return singleOwner ? `/${slug}` : `/${username ?? ""}/${slug}`;
+}
+
+/** What the URL field shows in front of the slug: `/` or `/<username>/`. */
+export function publicEventPrefix(username: string | null | undefined, singleOwner = IS_SINGLE_OWNER): string {
+  return singleOwner ? "/" : `/${username ?? ""}/`;
+}
+
+/** A slug the proxy would never route to a booking page. */
+export function isReservedSlug(slug: string): boolean {
+  const s = slug.trim().toLowerCase();
+  return s.startsWith("_") || s.includes(".") || RESERVED_SEGMENTS.has(s);
+}
 
 export function resolveOwnerRoute(pathname: string, ownerUsername: string | undefined): OwnerRoute {
   const username = ownerUsername?.trim();

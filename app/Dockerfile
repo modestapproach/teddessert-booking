@@ -21,6 +21,9 @@ COPY . .
 # CALENDSO_ENCRYPTION_KEY) are injected at runtime via CF secrets — the
 # build-time placeholders here only satisfy next.config.ts existence checks.
 ARG NEXT_PUBLIC_WEBAPP_URL=https://book.teddessert.com
+# WEBSITE_URL falls back to https://cal.com when unset; the editor and create
+# dialog build their preview/copy links from it.
+ARG NEXT_PUBLIC_WEBSITE_URL=https://book.teddessert.com
 ARG NEXT_PUBLIC_CONVEX_URL=https://effervescent-dinosaur-191.convex.cloud
 ARG NEXT_PUBLIC_CONVEX_SITE_URL=https://effervescent-dinosaur-191.convex.site
 ARG NEXTAUTH_SECRET=placeholder-build-only-replaced-at-runtime
@@ -31,6 +34,7 @@ ARG NEXT_PUBLIC_APP_NAME="Ted Dessert"
 
 ENV NEXT_PUBLIC_WEBAPP_URL=$NEXT_PUBLIC_WEBAPP_URL \
     NEXT_PUBLIC_CONVEX_URL=$NEXT_PUBLIC_CONVEX_URL \
+    NEXT_PUBLIC_WEBSITE_URL=$NEXT_PUBLIC_WEBSITE_URL \
     NEXT_PUBLIC_CONVEX_SITE_URL=$NEXT_PUBLIC_CONVEX_SITE_URL \
     NEXT_PUBLIC_APP_NAME=$NEXT_PUBLIC_APP_NAME \
     NEXTAUTH_SECRET=$NEXTAUTH_SECRET \

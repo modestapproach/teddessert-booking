@@ -8,7 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 // We'll test the wrapped proxy as it would be used in production
 import proxy from "./proxy";
 import { config } from "./proxy";
-import { OWNER_ROUTING_MATCHER } from "@lib/ownerRouting";
+import { OWNER_ROUTING_MATCHER } from "@calcom/lib/ownerRouting";
 
 // Mock dependencies at module level
 vi.mock("@vercel/edge-config", () => ({

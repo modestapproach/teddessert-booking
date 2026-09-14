@@ -1,4 +1,5 @@
 import { WEBAPP_URL } from "@calcom/lib/constants";
+import { publicEventPath } from "@calcom/lib/ownerRouting";
 import logger from "@calcom/lib/logger";
 import { safeStringify } from "@calcom/lib/safeStringify";
 
@@ -51,5 +52,5 @@ export async function buildEventUrlFromBooking(booking: {
     logger.error("No username found for booking user.", safeStringify({ profileEnrichedBookingUser }));
     throw new Error("No username found for booking user.");
   }
-  return `${bookerUrl}/${username}/${eventSlug}`;
+  return `${bookerUrl}${publicEventPath(username, eventSlug)}`;
 }

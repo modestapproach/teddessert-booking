@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { publicEventPrefix } from "@calcom/lib/ownerRouting";
 import { useState } from "react";
 import type { UseFormReturn } from "react-hook-form";
 
@@ -68,7 +69,7 @@ export default function CreateEventTypeForm({
               addOnLeading={
                 !isPlatform ? (
                   <span className="max-w-24 md:max-w-56 inline-block overflow-hidden text-ellipsis whitespace-nowrap min-w-0">
-                    {`/${!isManagedEventType ? pageSlug : t("username_placeholder")}/`}
+                    {!isManagedEventType ? publicEventPrefix(pageSlug) : `/${t("username_placeholder")}/`}
                   </span>
                 ) : undefined
               }
@@ -92,9 +93,9 @@ export default function CreateEventTypeForm({
               addOnLeading={
                 !isPlatform ? (
                   <Tooltip
-                    content={`${urlPrefix}/${!isManagedEventType ? pageSlug : t("username_placeholder")}/`}>
+                    content={`${urlPrefix}${!isManagedEventType ? publicEventPrefix(pageSlug) : `/${t("username_placeholder")}/`}`}>
                     <span className="max-w-24 md:max-w-56 inline-block overflow-hidden text-ellipsis whitespace-nowrap min-w-0">
-                      {`${urlPrefix}/${!isManagedEventType ? pageSlug : t("username_placeholder")}/`}
+                      {`${urlPrefix}${!isManagedEventType ? publicEventPrefix(pageSlug) : `/${t("username_placeholder")}/`}`}
                     </span>
                   </Tooltip>
                 ) : undefined

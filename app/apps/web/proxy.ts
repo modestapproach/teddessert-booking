@@ -1,5 +1,5 @@
 import { getCspHeader, getCspNonce } from "@lib/csp";
-import { resolveOwnerRoute } from "@lib/ownerRouting";
+import { resolveOwnerRoute } from "@calcom/lib/ownerRouting";
 import { get } from "@vercel/edge-config";
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
@@ -93,7 +93,7 @@ const proxy = async (req: NextRequest): Promise<NextResponse<unknown>> => {
 
   // Single-owner clean URLs: `/` and `/<event-slug>` are the owner's public
   // booking pages, `/<username>/…` canonicalizes to the clean form, and the
-  // dashboard lives under /dash. See lib/ownerRouting.ts.
+  // dashboard lives under /dash. See @calcom/lib/ownerRouting.
   const owner = resolveOwnerRoute(url.pathname, process.env.OWNER_USERNAME);
   if (owner.kind === "redirect") {
     const target = url.clone();
@@ -179,7 +179,7 @@ export const config = {
   // The first entry covers every page path so `/` and `/<slug>` reach
   // resolveOwnerRoute. Next reads this config statically at build time, so it
   // must be a literal: keep it identical to OWNER_ROUTING_MATCHER in
-  // lib/ownerRouting.ts (proxy.test.ts asserts they match). The explicit
+  // @calcom/lib/ownerRouting (proxy.test.ts asserts they match). The explicit
   // entries stay for the API path the pattern excludes.
   matcher: [
     "/((?!api/|_next/|_trpc/|_proxy/|.*\\..*).*)",
