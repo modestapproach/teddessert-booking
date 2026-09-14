@@ -1,5 +1,5 @@
 import { getCspHeader, getCspNonce } from "@lib/csp";
-import { OWNER_ROUTING_MATCHER, resolveOwnerRoute } from "@lib/ownerRouting";
+import { resolveOwnerRoute } from "@lib/ownerRouting";
 import { get } from "@vercel/edge-config";
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
@@ -176,10 +176,21 @@ function enrichRequestWithHeaders({ req }: { req: NextRequest }) {
 }
 
 export const config = {
-  // OWNER_ROUTING_MATCHER covers every page path (so `/` and `/<slug>` reach
-  // resolveOwnerRoute); the explicit entries are kept for the API path it
-  // excludes and for readability of what else the proxy cares about.
-  matcher: [OWNER_ROUTING_MATCHER, "/auth/login", "/login", "/apps/installed", "/auth/logout", "/:path*/embed", "/availability", "/api/auth/signup"],
+  // The first entry covers every page path so `/` and `/<slug>` reach
+  // resolveOwnerRoute. Next reads this config statically at build time, so it
+  // must be a literal: keep it identical to OWNER_ROUTING_MATCHER in
+  // lib/ownerRouting.ts (proxy.test.ts asserts they match). The explicit
+  // entries stay for the API path the pattern excludes.
+  matcher: [
+    "/((?!api/|_next/|_trpc/|_proxy/|.*\\..*).*)",
+    "/auth/login",
+    "/login",
+    "/apps/installed",
+    "/auth/logout",
+    "/:path*/embed",
+    "/availability",
+    "/api/auth/signup",
+  ],
 };
 
 export default proxy;
