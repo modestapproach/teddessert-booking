@@ -14,10 +14,10 @@ deploy/                      fallback: run the same container on any Linux box (
 
 ## How it fits together
 
-- **Public booking page** `https://book.teddessert.com/<OWNER_USERNAME>/<event-slug>` — no login.
+- **Public booking page** `https://book.teddessert.com/` (every public event) and `https://book.teddessert.com/<event-slug>` (one event) — no login. `/<OWNER_USERNAME>/…` links still work and redirect to the clean form (`app/apps/web/lib/ownerRouting.ts`).
   The Cal.com Booker reads event meta + slots and creates bookings through the
   Convex functions in `packages/backend/convex/scheduling/*`.
-- **Owner dashboard** `https://book.teddessert.com/` — sign in at `/owner-login`
+- **Owner dashboard** `https://book.teddessert.com/dash` — sign in at `/owner-login`
   with `OWNER_PASSWORD`. Event types, availability, connected calendars,
   bookings list — all Cal.com's real UI.
 - **Google Calendar** — connect from the dashboard (Settings → Calendars or the
@@ -153,7 +153,7 @@ or to pin and roll back to a specific `:<sha>`.
 2. Connect Google Calendar (consent screen is in Testing mode: the Google
    account must be listed as a test user).
 3. Set availability, create an event type (slug e.g. `chat`).
-4. Share `https://book.teddessert.com/<OWNER_USERNAME>/chat` from teddessert.com.
+4. Share `https://book.teddessert.com/<event-slug>` from teddessert.com.
 
 ## Tests
 

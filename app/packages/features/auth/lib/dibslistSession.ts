@@ -22,7 +22,8 @@ const log = logger.getSubLogger({ prefix: ["ownerSession"] });
  *   NEXTAUTH_SECRET  HMAC key for the cookie (already required by next.config)
  *   OWNER_EMAIL      owner identity (default owner@localhost)
  *   OWNER_NAME       display name
- *   OWNER_USERNAME   public booking-page username, e.g. `ted` → /ted/<slug>
+ *   OWNER_USERNAME   Cal.com username behind the public pages, e.g. `ted`;
+ *                    proxy.ts maps the clean / and /<slug> URLs onto /ted/<slug>
  */
 
 export const OWNER_COOKIE = "owner_session";
