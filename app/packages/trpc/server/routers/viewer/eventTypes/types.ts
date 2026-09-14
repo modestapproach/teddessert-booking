@@ -1,5 +1,4 @@
 import type {
-import { isReservedSlug } from "@calcom/lib/ownerRouting";
   CalVideoSettings,
   ChildInput,
   DestinationCalendarInput,
@@ -8,6 +7,7 @@ import { isReservedSlug } from "@calcom/lib/ownerRouting";
   HostGroupInput,
   HostInput,
 } from "@calcom/features/eventtypes/lib/types";
+import { isReservedSlug } from "@calcom/lib/ownerRouting";
 import { MAX_SEATS_PER_TIME_SLOT } from "@calcom/lib/constants";
 import {
   customInputSchema,

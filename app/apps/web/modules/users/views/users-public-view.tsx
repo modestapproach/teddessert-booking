@@ -1,12 +1,12 @@
 "use client";
 
 import {
-import { publicEventPath } from "@calcom/lib/ownerRouting";
   sdkActionManager,
   useEmbedNonStylesConfig,
   useEmbedStyles,
   useIsEmbed,
 } from "@calcom/embed-core/embed-iframe";
+import { publicEventPath } from "@calcom/lib/ownerRouting";
 import { useRouterQuery } from "@calcom/lib/hooks/useRouterQuery";
 import useTheme from "@calcom/lib/hooks/useTheme";
 import { UserAvatar } from "@calcom/ui/components/avatar";
