@@ -1,9 +1,13 @@
 import logger from "@calcom/lib/logger";
+import { OWNER_AUTH_USER_ID } from "@calcom/features/auth/lib/dibslistSession";
+import { convexIdToCalInt, listOwnerEventTypeRows } from "@calcom/lib/server/calcomAdminAdapters";
 import { markdownToSafeHTML } from "@calcom/lib/markdownToSafeHTML";
 import prisma from "@calcom/prisma";
 import type { Prisma } from "@calcom/prisma/client";
 import type { baseEventTypeSelect } from "@calcom/prisma/selects";
 import { EventTypeMetaDataSchema } from "@calcom/prisma/zod-utils";
+
+import { publicEventTypeRows } from "./publicEventTypesFromConvex";
 
 const log = logger.getSubLogger({ prefix: ["getEventTypesPublic"] });
 
@@ -30,19 +34,18 @@ type RawEventType = BaseEventType & {
 };
 
 const getEventTypesWithHiddenFromDB = async (userId: number) => {
-  // CV-11: the `/[user]` PROFILE SSR leaf (NOT in the CV-10 table — that only traced
-  // `/[user]/[type]`). `getServerSideProps.ts:165` calls `getEventTypesPublic(user.id)`
-  // UNCONDITIONALLY on every profile load; this raw `prisma.$queryRaw` against
-  // `"EventType"`/`"users"`/`"_user_eventtype"` THROWS on the no-Postgres fork → 500.
-  // On the fork the CV-10 `getUsersInOrgContext` synthesizes a public user with `id: 0`,
-  // so there is no real Postgres user/event-type graph to read here anyway. The fork has
-  // no per-owner public-event-type-LIST Convex read (the only public Convex surface is the
-  // single-event `EventRepository.getPublicEvent`, slug-scoped — §CV-2a); the profile grid
-  // is a display-only listing, so the cal-shaped default is an EMPTY event-type array (the
-  // SSR `eventTypes.length === 1` redirect and the `.map` both tolerate `[]`). Anonymous
-  // public SSR → key off `NEXT_PUBLIC_CONVEX_URL`. Prisma path intact for a real Postgres deploy.
+  // CV-11: the `/[user]` PROFILE SSR leaf. On the fork the profile user is the
+  // single owner (CV-10 synthesizes it with `id: 0`), so the Postgres user/
+  // event-type graph below does not exist; the public listing comes from the
+  // owner's Convex rows instead (the same `adminListEventTypes` read the
+  // dashboard uses, best-effort → `[]`). The caller drops `hidden` rows; the
+  // profile grid renders id/slug/title. Anonymous public SSR → key off
+  // `NEXT_PUBLIC_CONVEX_URL`. Prisma path intact for a real Postgres deploy.
   if (process.env.NEXT_PUBLIC_CONVEX_URL) {
-    return [] as RawEventType[];
+    const rows = await listOwnerEventTypeRows({ ownerAuthUserId: OWNER_AUTH_USER_ID });
+    // Built field-for-field from cal's baseEventTypeSelect (see the mapper);
+    // the cast only bridges Prisma's generated enum/Json types.
+    return publicEventTypeRows(rows, convexIdToCalInt) as unknown as RawEventType[];
   }
 
   const eventTypes = await prisma.$queryRaw<RawEventType[]>`

@@ -227,7 +227,9 @@ function buildPublicForkUser(username: string): ForkPublicUser {
   return {
     id: 0,
     username,
-    name: username,
+    // The single owner's display name (forwarded into the container alongside
+    // OWNER_USERNAME); anything else stays username-as-name.
+    name: (username.toLowerCase() === process.env.OWNER_USERNAME?.trim().toLowerCase() && process.env.OWNER_NAME?.trim()) || username,
     bio: null,
     avatarUrl: null,
     verified: false,
