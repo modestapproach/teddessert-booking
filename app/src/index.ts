@@ -4,19 +4,25 @@ interface Env {
   BOOKING_APP: DurableObjectNamespace<BookingApp>;
   NEXTAUTH_SECRET: string;
   CALENDSO_ENCRYPTION_KEY: string;
-  OWNER_PASSWORD: string;
   OWNER_EMAIL?: string;
   OWNER_NAME?: string;
   OWNER_USERNAME?: string;
+  // Cloudflare Access verification for /owner-login (Google sign-in, no
+  // password) — see packages/features/auth/lib/cloudflareAccess.ts.
+  ACCESS_TEAM_DOMAIN?: string;
+  ACCESS_AUD?: string;
+  ACCESS_ALLOWED_EMAILS?: string;
 }
 
 const FORWARDED_SECRETS = [
   "NEXTAUTH_SECRET",
   "CALENDSO_ENCRYPTION_KEY",
-  "OWNER_PASSWORD",
   "OWNER_EMAIL",
   "OWNER_NAME",
   "OWNER_USERNAME",
+  "ACCESS_TEAM_DOMAIN",
+  "ACCESS_AUD",
+  "ACCESS_ALLOWED_EMAILS",
 ] as const;
 
 export class BookingApp extends Container {
