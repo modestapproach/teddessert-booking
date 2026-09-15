@@ -6,8 +6,11 @@ name: Deploy booking app (CF Containers)
 # managed registry — GHCR is not involved (build-image.yml is a manual
 # fallback for running the same image off Cloudflare).
 #
-# Secrets are synced from repository secrets of the same name. All eight must
-# exist or the deploy fails at the preflight step below.
+# Secrets are synced from repository secrets of the same name. All seven must
+# exist or the deploy fails at the preflight step below. Owner sign-in itself
+# is Cloudflare Access (Google) on /owner-login — ACCESS_TEAM_DOMAIN/
+# ACCESS_AUD/ACCESS_ALLOWED_EMAILS live as plain [vars] in wrangler.toml, not
+# secrets, since none of them are sensitive.
 
 on:
   push:
@@ -37,14 +40,13 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET }}
           CALENDSO_ENCRYPTION_KEY: ${{ secrets.CALENDSO_ENCRYPTION_KEY }}
-          OWNER_PASSWORD: ${{ secrets.OWNER_PASSWORD }}
           OWNER_EMAIL: ${{ secrets.OWNER_EMAIL }}
           OWNER_NAME: ${{ secrets.OWNER_NAME }}
           OWNER_USERNAME: ${{ secrets.OWNER_USERNAME }}
         run: |
           missing=()
           for v in CLOUDFLARE_API_TOKEN CLOUDFLARE_ACCOUNT_ID NEXTAUTH_SECRET \
-                   CALENDSO_ENCRYPTION_KEY OWNER_PASSWORD OWNER_EMAIL \
+                   CALENDSO_ENCRYPTION_KEY OWNER_EMAIL \
                    OWNER_NAME OWNER_USERNAME; do
             [ -n "${!v}" ] || missing+=("$v")
           done
@@ -52,7 +54,7 @@ jobs:
             echo "::error::Missing repository secrets: ${missing[*]} — add them under Settings → Secrets and variables → Actions"
             exit 1
           fi
-          echo "All 8 required secrets are present."
+          echo "All 7 required secrets are present."
 
       # The multi-stage cal build overruns the runner's default free space.
       - name: Free runner disk space
@@ -87,28 +89,29 @@ jobs:
           secrets: |
             NEXTAUTH_SECRET
             CALENDSO_ENCRYPTION_KEY
-            OWNER_PASSWORD
             OWNER_EMAIL
             OWNER_NAME
             OWNER_USERNAME
         env:
           NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET }}
           CALENDSO_ENCRYPTION_KEY: ${{ secrets.CALENDSO_ENCRYPTION_KEY }}
-          OWNER_PASSWORD: ${{ secrets.OWNER_PASSWORD }}
           OWNER_EMAIL: ${{ secrets.OWNER_EMAIL }}
           OWNER_NAME: ${{ secrets.OWNER_NAME }}
           OWNER_USERNAME: ${{ secrets.OWNER_USERNAME }}
 
       # A fresh container has to boot before it can answer, and the Worker
       # returns 503 "warming up" until it does — so retry rather than taking
-      # the first response as the verdict.
+      # the first response as the verdict. /owner-login sits behind
+      # Cloudflare Access, so an unauthenticated CI request never reaches the
+      # app — it gets Access's own 302 to the Google login page, which is
+      # itself proof the container (and Access) are both up.
       - name: Smoke
         run: |
           for i in $(seq 1 12); do
             code=$(curl -sS -o /dev/null -w "%{http_code}" https://book.teddessert.com/owner-login || echo 000)
             echo "attempt $i: /owner-login -> $code"
-            case "$code" in 200|307) echo "up"; exit 0 ;; esac
+            case "$code" in 200|302|307) echo "up"; exit 0 ;; esac
             sleep 15
           done
-          echo "::error::book.teddessert.com/owner-login never answered 200/307 within ~3 minutes"
+          echo "::error::book.teddessert.com/owner-login never answered within ~3 minutes"
           exit 1

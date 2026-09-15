@@ -56,11 +56,18 @@ NEXT_PUBLIC_CONVEX_SITE_URL = "https://effervescent-dinosaur-191.convex.site"
 SKIP_DB_MIGRATIONS = "1"
 # NEXT_PUBLIC_VERCEL_USE_BOTID_IN_BOOKER must NOT be set
 
+# Owner sign-in is Cloudflare Access (Google) on /owner-login — see
+# app/owner-login/route.ts. ACCESS_TEAM_DOMAIN and ACCESS_AUD aren't secret
+# (the aud is public inside the signed JWT itself); ACCESS_ALLOWED_EMAILS
+# lists who Access is allowed to mint an owner cookie for.
+ACCESS_TEAM_DOMAIN = "https://sparkling-heart-4a51.cloudflareaccess.com"
+ACCESS_AUD = "79bd7f2d6be74b67ecafc3aa98ff280c698e09364ee753969e9e5aef37f5292c"
+ACCESS_ALLOWED_EMAILS = "ted@teddessert.com,theodoreyd@gmail.com"
+
 # Secrets — set once via CLI or synced by the GitHub Actions workflow from the
 # repository secrets of the same names:
 #   cd app && wrangler secret put NEXTAUTH_SECRET
 #   cd app && wrangler secret put CALENDSO_ENCRYPTION_KEY
-#   cd app && wrangler secret put OWNER_PASSWORD
 #   cd app && wrangler secret put OWNER_EMAIL
 #   cd app && wrangler secret put OWNER_NAME
 #   cd app && wrangler secret put OWNER_USERNAME
