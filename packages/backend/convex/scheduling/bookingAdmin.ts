@@ -268,3 +268,77 @@ export const adminRescheduleBooking = mutation({
     });
   },
 });
+
+// ─────────────────────────────────────────────────────────────
+// Identity-ledger links (cross-app link contract)
+// ─────────────────────────────────────────────────────────────
+//
+// Bookings know people only by the email a visitor typed. The owner's identity
+// ledger is the one system that says who that is, so the owner (or their agent)
+// stamps `ledgerId` onto the attendee rows for an email. Nothing here creates or
+// edits a person; a null `ledgerId` removes the link.
+
+export const LEDGER_PERSON_ID =
+  /^ledger:person:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+
+export const adminLinkAttendee = mutation({
+  args: {
+    ownerAuthUserId: v.string(),
+    email: v.string(),
+    ledgerId: v.union(v.string(), v.null()),
+  },
+  handler: async (ctx, { ownerAuthUserId, email, ledgerId }) => {
+    if (ledgerId !== null && !LEDGER_PERSON_ID.test(ledgerId)) {
+      throw new ConvexError({
+        kind: "bad_ledger_id",
+        message: "ledgerId must look like ledger:person:<uuid>.",
+      });
+    }
+    const wanted = email.trim().toLowerCase();
+    if (!wanted) {
+      throw new ConvexError({ kind: "bad_email", message: "email is required." });
+    }
+    // Emails are stored as the visitor typed them, so the exact-match `by_email`
+    // index would miss "Casey@Example.com". One owner's attendee rows are few
+    // (single-owner site), so scan them and compare case-insensitively.
+    const rows = await ctx.db
+      .query("bookingAttendees")
+      .withIndex("by_owner", (q: Ctx) => q.eq("ownerAuthUserId", ownerAuthUserId))
+      .collect();
+    let linked = 0;
+    for (const row of rows) {
+      if (row.role === "host" || row.email.trim().toLowerCase() !== wanted) continue;
+      await ctx.db.patch(row._id, { ledgerId: ledgerId ?? undefined });
+      linked++;
+    }
+    return { email: wanted, ledgerId, attendeeRows: linked };
+  },
+});
+
+// Every booking one ledger person is on, newest first (the person view's source).
+export const listBookingsForPerson = query({
+  args: { ownerAuthUserId: v.string(), ledgerId: v.string() },
+  handler: async (ctx, { ownerAuthUserId, ledgerId }) => {
+    const rows = await ctx.db
+      .query("bookingAttendees")
+      .withIndex("by_owner_ledgerId", (q: Ctx) =>
+        q.eq("ownerAuthUserId", ownerAuthUserId).eq("ledgerId", ledgerId),
+      )
+      .collect();
+    const out = [];
+    for (const a of rows) {
+      const booking = await ctx.db.get(a.bookingId as Id<"bookings">);
+      if (!booking) continue;
+      const et = await ctx.db.get(booking.eventTypeId as Id<"eventTypes">);
+      out.push({
+        bookingId: booking._id,
+        status: booking.status,
+        startTime: booking.startTime,
+        endTime: booking.endTime,
+        eventType: et ? { slug: et.slug, title: et.title } : null,
+        attendee: { name: a.name, email: a.email, role: a.role },
+      });
+    }
+    return out.sort((x, y) => y.startTime - x.startTime);
+  },
+});

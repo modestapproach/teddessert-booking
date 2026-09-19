@@ -418,11 +418,17 @@ export default defineSchema({
       v.literal("guest"),
     ),
     emailVerifiedAt: v.optional(v.number()), // email-verification gate
+    // Link contract: who this attendee is in the owner's identity ledger
+    // (`ledger:person:<uuid>`). Set only by the owner (adminLinkAttendee) —
+    // never inferred at booking time, because the booker's email is typed by
+    // an unauthenticated visitor. The ledger owns identity; this is a reference.
+    ledgerId: v.optional(v.string()),
     createdAt: v.number(),
   })
     .index("by_booking", ["bookingId"])
     .index("by_email", ["email"])
-    .index("by_owner", ["ownerAuthUserId"]),
+    .index("by_owner", ["ownerAuthUserId"])
+    .index("by_owner_ledgerId", ["ownerAuthUserId", "ledgerId"]),
 
   // Cached external busy intervals per (selectedCalendar, window). Replaces
   // cal.com's Redis withSlotsCache so getAvailableSlots stays a reactive query.

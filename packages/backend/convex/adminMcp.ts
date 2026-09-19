@@ -385,6 +385,31 @@ export const ADMIN_MCP_TOOLS: AdminTool[] = [
       }),
   },
 
+  // Identity-ledger links -----------------------------------------------------
+  {
+    name: "link_attendee",
+    description: "Record who a booking attendee is in the owner's identity ledger: stamps ledgerId (ledger:person:<uuid>) on every attendee row with this email. Look the person up in the ledger first; pass ledgerId null to remove the link. New bookings are not linked automatically (the email is typed by an unauthenticated visitor) — call this again after a new booking arrives.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        email: str("Attendee email as shown by list_bookings."),
+        ledgerId: { type: ["string", "null"], description: "ledger:person:<uuid>, or null to unlink." },
+      },
+      required: ["email", "ledgerId"],
+    },
+    scope: "admin:write",
+    call: (ctx, args, owner) =>
+      ctx.runMutation(bookingAdmin.adminLinkAttendee, { ownerAuthUserId: owner, email: String(args.email ?? ""), ledgerId: args.ledgerId ?? null }),
+  },
+  {
+    name: "list_bookings_for_person",
+    description: "Every booking a ledger person (ledger:person:<uuid>) is on, newest first. Only finds attendees already linked with link_attendee.",
+    inputSchema: { type: "object", properties: { ledgerId: str("ledger:person:<uuid>.") }, required: ["ledgerId"] },
+    scope: "admin:read",
+    call: (ctx, args, owner) =>
+      ctx.runQuery(bookingAdmin.listBookingsForPerson, { ownerAuthUserId: owner, ledgerId: String(args.ledgerId ?? "") }),
+  },
+
   // Calendars -----------------------------------------------------------------
   {
     name: "list_connected_calendars",

@@ -21,6 +21,8 @@ import {
   bookingMatchesStatus,
   adminCancelBooking,
   adminRescheduleBooking,
+  adminLinkAttendee,
+  listBookingsForPerson,
 } from "./bookingAdmin";
 
 type Doc = Record<string, any> & { _id: string; _creationTime: number };
@@ -565,5 +567,41 @@ describe("adminRescheduleBooking — owner reschedule (s2s)", () => {
     expect(kind).toBe("booking_not_found");
     const row = await ctx.db.get(oldId);
     expect(row.status).toBe("accepted");
+  });
+});
+
+// ─────────────────────────────────────────────────────────────
+// Identity-ledger links — owner-stamped, email-scoped, never inferred
+// ─────────────────────────────────────────────────────────────
+describe("adminLinkAttendee / listBookingsForPerson — ledger links", () => {
+  const link = (c: any, a: any) => (adminLinkAttendee as any)._handler(c, a);
+  const forPerson = (c: any, a: any) => (listBookingsForPerson as any)._handler(c, a);
+  const PERSON = "ledger:person:b9ce7c04-ab61-443b-b5b4-f74fadc6924d";
+
+  it("links every booking for that email, case-insensitively, and only this owner's", async () => {
+    await seedBooking(ctx, eventTypeId, { startTime: NOW + 1_000, endTime: NOW + 2_000 });
+    await seedBooking(ctx, eventTypeId, { startTime: NOW + 3_000, endTime: NOW + 4_000, attendee: { name: "Casey", email: "Casey@Example.com" } });
+    await seedBooking(ctx, eventTypeId, { startTime: NOW + 5_000, endTime: NOW + 6_000, attendee: { name: "Sam", email: "sam@example.com" } });
+    await seedBooking(ctx, eventTypeId, { owner: OTHER, startTime: NOW + 7_000, endTime: NOW + 8_000 });
+
+    const res = await link(ctx, { ownerAuthUserId: OWNER, email: "casey@example.com", ledgerId: PERSON });
+    expect(res.attendeeRows).toBe(2);
+
+    const mine = await forPerson(ctx, { ownerAuthUserId: OWNER, ledgerId: PERSON });
+    expect(mine.map((b: any) => b.startTime)).toEqual([NOW + 3_000, NOW + 1_000]);
+    expect(await forPerson(ctx, { ownerAuthUserId: OTHER, ledgerId: PERSON })).toEqual([]);
+  });
+
+  it("rejects a name in place of a ledger id", async () => {
+    await expect(
+      link(ctx, { ownerAuthUserId: OWNER, email: "casey@example.com", ledgerId: "Casey Candidate" }),
+    ).rejects.toBeInstanceOf(ConvexError);
+  });
+
+  it("null removes the link", async () => {
+    await seedBooking(ctx, eventTypeId, { startTime: NOW + 1_000, endTime: NOW + 2_000 });
+    await link(ctx, { ownerAuthUserId: OWNER, email: "casey@example.com", ledgerId: PERSON });
+    await link(ctx, { ownerAuthUserId: OWNER, email: "casey@example.com", ledgerId: null });
+    expect(await forPerson(ctx, { ownerAuthUserId: OWNER, ledgerId: PERSON })).toEqual([]);
   });
 });
