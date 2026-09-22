@@ -237,9 +237,12 @@ export function toCalSchedule(result: ConvexAvailableSlotsResult): {
 } {
   const slots: Record<string, Array<{ time: string }>> = {};
   for (const [date, daySlots] of Object.entries(result.slotsByDate)) {
-    slots[date] = daySlots.map((s) => ({
-      time: new Date(s.startMs).toISOString(),
-    }));
+    // Convex returns each day's slots ranked best-first (E2 scoring). cal's
+    // Booker renders the array in order and assumes it is chronological, so
+    // re-sort here; the ranking is a backend/admin concern, not the public UI's.
+    slots[date] = [...daySlots]
+      .sort((a, b) => a.startMs - b.startMs)
+      .map((s) => ({ time: new Date(s.startMs).toISOString() }));
   }
   return { slots };
 }
